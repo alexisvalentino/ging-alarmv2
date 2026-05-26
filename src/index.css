@@ -1,0 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Pacifico&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-logo: "Pacifico", cursive;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-ging-orange: #FF6C35;
+  --color-ging-red: #FF3D4C;
+}
+
+/* Custom glow effect */
+.orange-glow {
+  box-shadow: 0 0 30px rgba(255, 108, 53, 0.4);
+}
+
+.pulsing-glow {
+  animation: pulse-glow 2s infinite ease-in-out;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(255, 108, 53, 0.4);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(255, 61, 76, 0.75);
+    transform: scale(1.02);
+  }
+}
+
+/* Custom camera overlay scanning line animation */
+.scan-line {
+  animation: scan 2.5s infinite linear;
+}
+
+@keyframes scan {
+  0% {
+    top: 5%;
+  }
+  50% {
+    top: 95%;
+  }
+  100% {
+    top: 5%;
+  }
+}
+
+/* Professional Polish Theme helpers */
+.polish-shadow {
+  box-shadow: 4px 4px 0px 0px rgba(0,0,0,1);
+}
+
+.polish-shadow-lg {
+  box-shadow: 6px 6px 0px 0px rgba(0,0,0,1);
+}
+
+.polish-shadow-sm {
+  box-shadow: 2px 2px 0px 0px rgba(0,0,0,1);
+}
+
+.polish-card {
+  background-color: white;
+  border: 2px solid #000000;
+  box-shadow: 4px 4px 0px 0px rgba(0,0,0,1);
+  border-radius: 1rem;
+  color: #121212;
+}
+
+.polish-card-dark {
+  background-color: #000000;
+  border: 2px solid #1c1c1e;
+  box-shadow: 4px 4px 0px 0px rgba(255,108,53,0.3);
+  border-radius: 1rem;
+  color: #ffffff;
+}
+

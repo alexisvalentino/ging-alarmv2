@@ -1,0 +1,6 @@
+{
+  "name": "Ging",
+  "description": "The ruthless alarm app that won't stop ringing until you physically get up and scan your QR code with your camera.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
