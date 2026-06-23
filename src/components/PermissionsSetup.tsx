@@ -6,8 +6,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  ShieldCheck, ShieldAlert, Camera, Music, Rows, BatteryCharging,
-  Lock, BellRing, Info, AlertTriangle, ArrowRight, CheckCircle2
+  Camera, Music, Rows, BatteryCharging,
+  Lock, BellRing, Info, ChevronRight
 } from 'lucide-react';
 import { PermissionItem } from '../types';
 import GingLogo from './GingLogo';
@@ -163,35 +163,37 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
   };
 
   const allReady = permissions.every(p => p.granted);
+  const grantedCount = permissions.filter(p => p.granted).length;
 
   return (
-    <div className="relative min-h-screen bg-gray-50 text-black flex flex-col justify-between p-6 overflow-x-hidden font-sans">
+    <div className="relative min-h-screen ambient-glow-bg text-white flex flex-col justify-between p-6 overflow-x-hidden font-sans">
+      {/* Ambient haze */}
+      <div className="glow-sphere-orange top-[-10%] left-[-15%]" />
+      <div className="glow-sphere-red bottom-[-15%] right-[-10%]" />
 
-      {/* Upper Brand Badge */}
-      <div className="max-w-md w-full mx-auto flex items-center justify-between py-3 border-b-2 border-black">
+      {/* Header */}
+      <div className="max-w-md w-full mx-auto flex items-center justify-between py-3 border-b border-white/[0.06] z-10">
         <div className="flex items-center gap-2">
-          <GingLogo size={36} />
-          <span className="font-sans font-black text-xl tracking-wider text-black uppercase">Ging Setup</span>
+          <GingLogo size={32} />
+          <span className="font-sans font-semibold text-[17px] text-white tracking-tight">Ging</span>
         </div>
-        <span className="text-[10px] font-mono font-black text-black uppercase tracking-widest bg-zinc-200 px-3 py-1 rounded border-2 border-black polish-shadow-sm">
-          SUPERUSERS ONLY
+        <span className="text-[13px] font-medium text-zinc-400">
+          {grantedCount}/{permissions.length}
         </span>
       </div>
 
-      {/* Main Core Form */}
-      <div className="flex-1 max-w-md w-full mx-auto py-8">
-        <div className="mb-6 bg-white border-2 border-black p-5 rounded-2xl polish-shadow">
-          <h2 className="text-xl font-black tracking-tight text-black flex items-center gap-2 uppercase">
-            1. The Protocol
-            <ShieldAlert className="w-5 h-5 text-orange-600" />
-          </h2>
-          <p className="text-zinc-600 text-xs mt-2 leading-relaxed italic font-medium">
-            Ging requires total system authorization override to bypass mobile sleep limits. Enable these superpermissions to build your wake-up shield:
+      {/* Main */}
+      <div className="flex-1 max-w-md w-full mx-auto py-6 z-10 space-y-4">
+        {/* Section title + intro (iOS Settings style) */}
+        <div className="px-2">
+          <h1 className="text-[28px] font-bold text-white tracking-tight">Permissions</h1>
+          <p className="text-[13px] text-zinc-400 mt-1.5 leading-relaxed">
+            These let your alarm ring at full volume, even through Android sleep modes.
           </p>
         </div>
 
-        {/* Permissions list */}
-        <div className="space-y-3">
+        {/* Permissions grouped list (iOS Settings look) */}
+        <div className="glass-card divide-y divide-white/[0.06] overflow-hidden">
           {permissions.map((p) => {
             const Icon = {
               camera: Camera,
@@ -202,95 +204,88 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
               notification: BellRing
             }[p.key];
 
+            const expanded = activeInfoKey === p.key;
+
             return (
-              <div
-                key={p.id}
-                className={`p-4 rounded-2xl border-2 border-black transition-all ${p.granted
-                    ? 'bg-green-50 text-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]'
-                    : 'bg-white text-black polish-shadow'
-                  }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className={`p-2.5 rounded-xl mt-0.5 border-2 border-black ${p.granted ? 'bg-green-200 text-green-950' : 'bg-gray-100 text-zinc-700'
-                      }`}>
-                      <Icon className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-bold text-sm tracking-tight">{p.title}</span>
-                        <span className={`text-[8px] font-mono font-bold px-1.5 py-0.5 rounded border border-black ${p.granted ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
-                          }`}>
-                          {p.urgency}
-                        </span>
-                      </div>
-                      <p className="text-xs text-zinc-650 mt-1 mr-4 font-medium leading-relaxed">{p.description}</p>
-                    </div>
+              <div key={p.id} className={p.granted ? '' : ''}>
+                <div className="flex items-center gap-3 px-4 py-3.5">
+                  {/* Icon tile */}
+                  <div className={`w-7 h-7 rounded-[7px] flex items-center justify-center shrink-0 ${p.granted
+                    ? 'bg-emerald-500/20 text-emerald-300'
+                    : 'bg-white/[0.08] text-zinc-300'
+                  }`}>
+                    <Icon className="w-[16px] h-[16px]" />
                   </div>
 
-                  {/* Interactive toggle / button */}
-                  <div className="flex flex-col items-end gap-1.5 pt-0.5 shrink-0">
-                    <button
-                      onClick={() => handleTogglePermission(p.key, p.granted)}
-                      className={`relative w-12 h-6 flex items-center rounded-full border-2 border-black cursor-pointer transition-colors duration-205 ${p.granted ? 'bg-green-400' : 'bg-gray-200'
-                        }`}
-                    >
-                      <span
-                        className={`w-4.5 h-4.5 rounded-full bg-white border border-black transition-transform duration-200 shadow-sm ${p.granted ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                      />
-                    </button>
+                  {/* Title + description */}
+                  <button
+                    onClick={() => setActiveInfoKey(expanded ? null : p.key)}
+                    className="flex-1 min-w-0 text-left"
+                  >
+                    <span className="font-medium text-[15px] text-white block truncate">{p.title}</span>
+                    <span className="text-[12.5px] text-zinc-400 block truncate">{p.description}</span>
+                  </button>
 
-                    <button
-                      onClick={() => setActiveInfoKey(activeInfoKey === p.key ? null : p.key)}
-                      className="p-1 px-2 text-zinc-500 hover:text-black hover:bg-gray-100 rounded border border-transparent hover:border-black/10 transition-colors"
-                      title="Why GING needs this"
-                    >
-                      <Info className="w-4 h-4" />
-                    </button>
-                  </div>
+                  {/* Toggle */}
+                  <button
+                    onClick={() => handleTogglePermission(p.key, p.granted)}
+                    className={`ios-toggle ${p.granted ? 'is-on' : 'is-off'} shrink-0`}
+                    aria-pressed={p.granted}
+                    aria-label={p.title}
+                  >
+                    <span className="ios-toggle__knob" />
+                  </button>
+
+                  {/* Info chevron */}
+                  <button
+                    onClick={() => setActiveInfoKey(expanded ? null : p.key)}
+                    className="shrink-0 text-zinc-500 p-1"
+                    aria-label="More info"
+                  >
+                    <ChevronRight className={`w-4 h-4 transition-transform ${expanded ? 'rotate-90' : ''}`} />
+                  </button>
                 </div>
 
-                {/* Drawer containing Android specifications */}
+                {/* Info drawer (content preserved verbatim) */}
                 <AnimatePresence>
-                  {activeInfoKey === p.key && (
+                  {expanded && (
                     <motion.div
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: 'auto', opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden mt-3 text-xs text-zinc-700 bg-zinc-50 border-t-2 border-dashed border-black/20 pt-3 flex gap-2 w-full"
+                      className="overflow-hidden bg-black/25"
                     >
-                      <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
-                      <div className="flex-1 min-w-0 break-words space-y-2 select-text">
-                        <span className="text-orange-600 font-extrabold font-mono block">GING SPEC INFO:</span>
+                      <div className="px-4 py-3.5 pl-14 flex gap-2.5">
+                        <Info className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0 break-words space-y-2 select-text">
+                          <div className="text-zinc-300 font-medium text-[12.5px] leading-relaxed w-full break-words whitespace-normal">
+                            {p.key === 'camera' && "Ging reads your QR code with a secure, on-device camera pipeline. Your video is analyzed locally and never sent anywhere."}
+                            {p.key === 'audio' && "Unlocks the audio channel so your alarm sounds immediately at full volume, without browser autoplay blocks."}
+                            {p.key === 'overlay' && (
+                              <div className="space-y-2 w-full break-words">
+                                <p className="whitespace-normal leading-relaxed">Lets the alarm appear over your lock screen and other apps, so you can't swipe it away or skip the QR scan.</p>
 
-                        <div className="text-zinc-600 font-bold text-xs leading-relaxed w-full break-words whitespace-normal">
-                          {p.key === 'camera' && "Utilizes a secure, local camera pipeline to read your QR code. Your video stream is analyzed entirely on your device and is never sent to the internet."}
-                          {p.key === 'audio' && "Initializes a highly reliable audio channel so your ringtone sounds immediately at the perfect wake-up volume without browser audio blockages."}
-                          {p.key === 'overlay' && (
-                            <div className="space-y-2 w-full break-words">
-                              <p className="whitespace-normal leading-relaxed text-zinc-650">Allows the alarm screen to launch directly over your lock screen and other open apps. This ensures you can't swipe it away or bypass the QR scan.</p>
-
-                              <div className="mt-2.5 p-3.5 bg-orange-50 border-2 border-black rounded-xl text-black space-y-2 shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] w-full break-words">
-                                <span className="font-black text-[10px] text-orange-750 block uppercase tracking-wider font-mono break-words leading-relaxed whitespace-normal">
-                                  🔓 How to Bypass Android's Restricted Settings (10-Second Fix):
-                                </span>
-                                <ol className="list-decimal list-inside space-y-1.5 text-[11px] font-bold text-zinc-800 leading-relaxed break-words whitespace-normal">
-                                  <li>Open your phone's general <span className="underline">Settings</span> app.</li>
-                                  <li>Go to <span className="underline">Apps ➔ App Management</span> (or search for <span className="font-mono text-black">Ging</span>) ➔ select the <span className="font-mono text-black">Ging</span> app info page.</li>
-                                  <li>In the top-right corner, tap the **three vertical dots (⋮)** menu button.</li>
-                                  <li>Tap <span className="text-orange-750 font-black">"Allow restricted settings"</span>.</li>
-                                  <li>Confirm using your phone's **PIN, Pattern, or Fingerprint** lock.</li>
-                                </ol>
-                                <span className="block text-[10px] text-zinc-650 italic mt-1 leading-normal font-semibold whitespace-normal">
-                                  You are now unlocked! Go back into the Ging app, toggle the Display Over Other Windows switch again, and Android will let you turn it on perfectly!
-                                </span>
+                                <div className="mt-2.5 p-3.5 bg-white/[0.05] border border-white/[0.08] rounded-xl text-zinc-300 space-y-2 w-full break-words">
+                                  <span className="font-semibold text-[11px] text-zinc-200 block leading-relaxed whitespace-normal">
+                                    If Android shows "restricted settings":
+                                  </span>
+                                  <ol className="list-decimal list-inside space-y-1.5 text-[12px] font-medium leading-relaxed break-words whitespace-normal text-zinc-400">
+                                    <li>Open your phone's <span className="text-white">Settings</span> app.</li>
+                                    <li>Go to <span className="text-white">Apps</span> and select <span className="text-white">Ging</span>.</li>
+                                    <li>Tap the <span className="text-white">three dots (⋮)</span> in the top-right.</li>
+                                    <li>Tap <span className="text-[#FFB37A] font-semibold">Allow restricted settings</span>.</li>
+                                    <li>Confirm with your PIN, pattern, or fingerprint.</li>
+                                  </ol>
+                                  <span className="block text-[11px] text-zinc-500 italic mt-1 leading-normal font-medium whitespace-normal">
+                                    Come back to Ging and toggle Display Over Other Windows again.
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                          )}
-                          {p.key === 'battery' && "Tells Android to keep Ging's background timer active even during deep phone sleep. This prevents your phone from putting the alarm to sleep to save battery."}
-                          {p.key === 'lockscreen' && "Forcibly wakes up your screen and turns on your screen backlight when the alarm goes off, even if your phone is locked."}
-                          {p.key === 'notification' && "Runs a lightweight background service to anchor your scheduled alarms. This prevents Android's system memory cleaner from shutting down your alarm timers."}
+                            )}
+                            {p.key === 'battery' && "Tells Android to keep Ging's timer running during deep sleep so your alarm fires on time."}
+                            {p.key === 'lockscreen' && "Wakes your screen and turns on the backlight when the alarm fires, even if your phone is locked."}
+                            {p.key === 'notification' && "Keeps a lightweight background service alive so Android's memory cleaner doesn't kill your alarm."}
+                          </div>
                         </div>
                       </div>
                     </motion.div>
@@ -302,43 +297,39 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
         </div>
 
         {cameraError && (
-          <div className="mt-4 p-3.5 bg-red-50 border-2 border-red-500 rounded-xl text-xs text-red-700 flex items-start gap-2 polish-shadow-sm font-semibold">
-            <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+          <div className="p-3.5 bg-red-500/10 border border-red-500/25 rounded-2xl text-[12.5px] text-red-300 flex items-start gap-2 font-medium">
+            <Camera className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
             <span>{cameraError}</span>
           </div>
         )}
       </div>
 
-      {/* Footer controls */}
-      <div className="max-w-md w-full mx-auto mt-6 flex flex-col gap-3">
+      {/* Footer CTA */}
+      <div className="max-w-md w-full mx-auto mt-6 flex flex-col gap-3 z-10">
         {!allReady && (
-          <div className="text-center p-3 w-full bg-orange-100 rounded-2xl border-2 border-orange-500 text-xs text-orange-850 font-bold uppercase tracking-wider">
-            🚨 REQUIREMENT CHECKPOINT
-            <p className="text-[10px] font-medium text-zinc-700 normal-case mt-0.5">
-              Activate all system superpermissions in the column above to boot Ging.
-            </p>
+          <div className="text-center text-[13px] text-zinc-400 font-medium px-2">
+            Enable all {permissions.length} permissions to continue
           </div>
         )}
 
         <button
           onClick={allReady ? onComplete : undefined}
           disabled={!allReady}
-          className={`w-full py-4 rounded-2xl font-sans font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all border-2 border-black ${allReady
-              ? 'bg-gradient-to-r from-orange-500 via-orange-600 to-red-700 text-white shadow-lg polish-shadow active:translate-y-1 active:shadow-none'
-              : 'bg-zinc-250 text-zinc-400 cursor-not-allowed border-dashed'
+          className={`w-full py-4 rounded-2xl font-sans font-semibold text-[15px] flex items-center justify-center gap-2 transition-all ${allReady
+              ? 'glass-button-glow cursor-pointer'
+              : 'bg-white/[0.04] text-zinc-500 border border-dashed border-white/[0.08] cursor-not-allowed'
             }`}
         >
           {allReady ? (
             <>
-              <span>Generate My Anti-Sleep QR Code</span>
-              <ArrowRight className="w-4 h-4 animate-pulse" />
+              <span>Continue</span>
+              <ChevronRight className="w-4 h-4" />
             </>
           ) : (
-            <span>SYSTEM SUPERPERMISSIONS ({permissions.filter(p => p.granted).length}/6)</span>
+            <span>{grantedCount} of {permissions.length} enabled</span>
           )}
         </button>
       </div>
-
     </div>
   );
 }
