@@ -7,12 +7,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import jsQR from 'jsqr';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Camera, Volume2, AlertOctagon, Flame, CheckCircle,
-  RefreshCw, Info, Lock, Clock, Smile, Ban
+  Camera, CheckCircle, RefreshCw, Ban
 } from 'lucide-react';
 import { Alarm } from '../types';
 import { gingAudio } from '../utils/audio';
-import GingLogo from './GingLogo';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 
 interface GingAndroidPlugin {
@@ -51,7 +49,7 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
   const loopRef = useRef<number | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
 
-  // Keep a flash/color toggle state for stressful background visual
+  // Keep a flash/color toggle state for the calm pulsing background
   const [flashToggle, setFlashToggle] = useState(false);
 
   // Sound triggering and live clock
@@ -80,10 +78,10 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
     updateClock();
     const interval = setInterval(updateClock, 1000);
 
-    // Strobe background color every 150ms for alarming stress factor!
+    // Calm pulsing toggle for the background (replaces the 180ms hard strobe)
     const flashInterval = setInterval(() => {
       setFlashToggle(prev => !prev);
-    }, 180);
+    }, 700);
 
     return () => {
       clearInterval(interval);
@@ -149,7 +147,7 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
     } catch (err: any) {
       console.error("Camera startup fully failed:", err);
       setErrorText(
-        `Unable to start video source: ${err?.message || err?.name || 'Could not start video source'}. Please ensure camera permissions are allowed in your device settings.`
+        `Unable to start camera: ${err?.message || err?.name || 'Could not start video source'}. Please allow camera access in your device settings.`
       );
     }
   };
@@ -166,14 +164,51 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
     setIsCameraActive(false);
   };
 
+  // Safety net: reattach the media stream to the video element if it gets disconnected
+  // This handles edge cases like React re-renders, AnimatePresence transitions, etc.
+  const ensureVideoStreamConnected = () => {
+    if (videoRef.current && mediaStreamRef.current && !videoRef.current.srcObject) {
+      console.warn('[GING] Video element lost stream connection — reattaching.');
+      videoRef.current.srcObject = mediaStreamRef.current;
+      videoRef.current.play().catch(e => console.error('[GING] Video play failed on reattach:', e));
+      if (!isCameraActive) setIsCameraActive(true);
+    }
+  };
+
+  // Whenever scan status transitions back to 'scanning', ensure the video stream is live
+  useEffect(() => {
+    if (scanStatus === 'scanning') {
+      ensureVideoStreamConnected();
+
+      // Also restart the scan loop if it died for any reason
+      if (!loopRef.current && mediaStreamRef.current) {
+        console.log('[GING] Restarting QR scan loop after status reset to scanning.');
+        loopRef.current = requestAnimationFrame(qrScanTick);
+      }
+    }
+  }, [scanStatus]);
+
   // QR scanning recursive routine using off-screen canvas rendering + jsQR decoding
   const qrScanTick = () => {
+    // If we've been authenticated, stop the loop permanently
+    if (scanStatusRef.current === 'authenticated') {
+      return;
+    }
+
     if (!videoRef.current || !canvasRef.current || !mediaStreamRef.current) {
       loopRef.current = requestAnimationFrame(qrScanTick);
       return;
     }
 
-    // Pause frame decoding while showing incorrect-code error or authenticated animations
+    // Safety: reattach stream if video element lost its source (e.g., after React remount)
+    if (!videoRef.current.srcObject && mediaStreamRef.current) {
+      console.warn('[GING] qrScanTick detected disconnected video — reattaching stream.');
+      videoRef.current.srcObject = mediaStreamRef.current;
+      videoRef.current.play().catch(e => console.error('[GING] Video play failed:', e));
+      if (!isCameraActive) setIsCameraActive(true);
+    }
+
+    // Pause frame decoding while showing incorrect-code error (but keep the loop alive!)
     if (scanStatusRef.current !== 'scanning') {
       loopRef.current = requestAnimationFrame(qrScanTick);
       return;
@@ -245,162 +280,183 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
 
   return (
     <div
-      className={`min-h-screen text-black select-none flex flex-col justify-between p-6 overflow-x-hidden font-sans transition-all duration-200 ${scanStatus === 'authenticated'
-          ? 'bg-green-100 text-black'
+      className={`relative min-h-screen text-white select-none flex flex-col justify-between p-6 overflow-x-hidden font-sans transition-colors duration-500 ${
+        scanStatus === 'authenticated'
+          ? 'ambient-glow-bg'
           : flashToggle
-            ? 'bg-red-500 text-white'
-            : 'bg-zinc-50'
-        }`}
+            ? 'bg-[#1a0406]'
+            : 'ambient-glow-bg'
+      }`}
     >
       {/* Hidden processing canvas used for frame analysis */}
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-      {/* Header Info */}
-      <div className="max-w-md w-full mx-auto flex items-center justify-between pb-3 border-b-2 border-black">
-        <div className="flex items-center gap-2">
-          <GingLogo size={36} />
-          <span className="font-sans font-black text-xl tracking-wider text-black uppercase">Ging Ringing</span>
-        </div>
-        <div className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest bg-zinc-200 text-black px-2.5 py-1 rounded border-2 border-black font-black polish-shadow-sm">
-          <Volume2 className="w-3.5 h-3.5 animate-pulse" />
-          <span>ALARM RINGING</span>
+      {/* Soft pulsing accent while scanning */}
+      {scanStatus !== 'authenticated' && (
+        <div className="glow-sphere-red top-[-10%] left-[-15%] opacity-70" />
+      )}
+
+      {/* Header */}
+      <div className="max-w-md w-full mx-auto flex items-center justify-between pb-3 border-b border-white/[0.06] z-10">
+        <span className="font-sans font-semibold text-[17px] text-white tracking-tight">
+          {alarm.label || 'Alarm'}
+        </span>
+        <div className="flex items-center gap-1.5 glass-badge-red px-3 py-1 rounded-full text-[12px] font-medium">
+          <span className={`w-1.5 h-1.5 rounded-full bg-[#FF453A] ${flashToggle ? 'opacity-100' : 'opacity-40'} transition-opacity`} />
+          <span>Ringing</span>
         </div>
       </div>
 
-      {/* Main Core Section */}
-      <div className="flex-1 max-w-md w-full mx-auto py-6 flex flex-col justify-center items-center">
+      {/* Main */}
+      <div className="flex-1 max-w-md w-full mx-auto py-6 flex flex-col justify-center items-center z-10 space-y-6">
 
-        {/* Giant Flashing Clock display to match alarm tone */}
-        <div className="text-center mb-6">
-          <span className="text-[10px] uppercase tracking-widest font-mono text-zinc-600 font-black block mb-1">
-            {alarm.label || 'Wake Up Challenge'}
+        {/* Big clock */}
+        <div className="text-center">
+          <span className="text-[13px] text-zinc-400 block mb-1">
+            {alarm.label || 'Alarm'}
           </span>
-          <h2 className="text-5xl font-black tracking-widest font-mono text-black filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.1)]">
+          <h2 className="text-[56px] font-semibold tracking-tight text-white">
             {currentTimeStr || '--:--'}
           </h2>
         </div>
 
-        {/* Big Alert Matrix */}
-        <AnimatePresence mode="wait">
-          {scanStatus === 'authenticated' ? (
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="p-6 bg-white border-2 border-black rounded-3xl text-center shadow-2xl relative w-full overflow-hidden polish-shadow"
-            >
-              <div className="p-3 bg-green-100 max-w-fit mx-auto rounded-full mb-3 text-green-950 border-2 border-black">
-                <CheckCircle className="w-8 h-8 animate-bounce" />
+        {/* Camera viewport — always mounted so the stream is never disconnected */}
+        <div
+          className={`w-full relative rounded-3xl border border-white/10 shadow-2xl bg-black overflow-hidden ${scanStatus === 'scanning' ? 'soft-pulse' : ''}`}
+        >
+          <div className="aspect-[4/3] relative">
+            {!isCameraActive && !errorText && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-500 gap-2 p-4 text-center z-10">
+                <RefreshCw className="w-7 h-7 animate-spin text-zinc-400" />
+                <span className="text-[13px] text-zinc-400 font-medium">Starting camera…</span>
               </div>
-              <h3 className="text-xl font-black font-sans uppercase">Wake Up Verified!</h3>
-              <p className="text-xs text-zinc-700 mt-2 font-semibold leading-relaxed">
-                Auth code matches current schedule. Standby... updating sleep tracker and restoring volume controls. Awesome start to your morning! ☕
-              </p>
-            </motion.div>
-          ) : scanStatus === 'wrong-code' ? (
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="p-6 bg-red-100 border-2 border-black rounded-3xl text-center shadow-2xl relative w-full overflow-hidden polish-shadow"
-            >
-              <div className="p-3 bg-red-200 max-w-fit mx-auto rounded-full mb-3 text-red-950 border-2 border-black">
-                <Ban className="w-8 h-8 animate-bounce" />
+            )}
+
+            {errorText && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-black/90 text-red-300 gap-3 overflow-y-auto z-20">
+                <Ban className="w-8 h-8 shrink-0 text-red-400" />
+                <span className="text-[13px] text-zinc-300 leading-relaxed font-medium">{errorText}</span>
+
+                <div className="flex flex-col gap-2 w-full max-w-xs mt-2">
+                  <button
+                    onClick={startCamera}
+                    className="w-full text-[14px] glass-button font-medium py-2.5 rounded-xl transition-transform active:scale-95"
+                  >
+                    Retry camera
+                  </button>
+                </div>
               </div>
-              <h3 className="text-lg font-black font-sans text-red-950 uppercase">INCORRECT CODE SCANNED</h3>
-              <p className="text-xs text-red-900 mt-2 font-bold leading-relaxed">
-                Ging detected code: <span className="font-mono font-black bg-white px-2 py-0.5 border border-black rounded">{currentScannedVal || "UNKNOWN"}</span>.
-                This does NOT match your alarm key! Stand up, go to your bathroom, and scan the correct physical QR poster.
-              </p>
-            </motion.div>
-          ) : (
-            /* ACTIVE CAMERA SCAN VIEWPORT OVERLAY */
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="w-full relative rounded-3xl border-2 border-black shadow-2xl bg-zinc-950 overflow-hidden polish-shadow"
-            >
-              {/* Camera view screen */}
-              <div className="aspect-[4/3] relative">
-                {!isCameraActive && !errorText && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-500 gap-2 p-4 text-center">
-                    <RefreshCw className="w-7 h-7 animate-spin text-orange-600" />
-                    <span className="text-xs text-zinc-400 font-bold uppercase tracking-wider">Booting Secure Camera Pipeline...</span>
+            )}
+
+            {/* Always-mounted video stream */}
+            <video
+              ref={videoRef}
+              className="w-full h-full object-cover"
+              playsInline
+              muted
+            />
+
+            {/* Scanner overlay during active scanning */}
+            {isCameraActive && scanStatus === 'scanning' && (
+              <div className="absolute inset-0 pointer-events-none">
+                {/* Animated scan line */}
+                <div className="absolute inset-x-10 h-0.5 bg-[#FF8A42]/80 scan-line" />
+
+                {/* Viewfinder corners */}
+                <div className="absolute top-5 left-5 w-7 h-7 border-t-2 border-l-2 border-[#FF8A42]/70 rounded-tl-lg" />
+                <div className="absolute top-5 right-5 w-7 h-7 border-t-2 border-r-2 border-[#FF8A42]/70 rounded-tr-lg" />
+                <div className="absolute bottom-5 left-5 w-7 h-7 border-b-2 border-l-2 border-[#FF8A42]/70 rounded-bl-lg" />
+                <div className="absolute bottom-5 right-5 w-7 h-7 border-b-2 border-r-2 border-[#FF8A42]/70 rounded-br-lg" />
+
+                {/* Center frame */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-32 h-32 relative">
+                    <div className="absolute inset-0 border border-[#FF8A42]/40 rounded-2xl" />
                   </div>
-                )}
+                </div>
 
-                {errorText && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-zinc-950/95 text-red-400 gap-3 overflow-y-auto">
-                    <AlertOctagon className="w-8 h-8 shrink-0 text-red-500 animate-bounce" />
-                    <span className="text-xs text-zinc-300 leading-relaxed font-bold">{errorText}</span>
+                {/* Bottom hint */}
+                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent pt-8 pb-3 px-4 text-center">
+                  <div className="flex items-center justify-center gap-1.5 text-[12px] font-medium text-[#FFB37A]">
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>Point at your QR code</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
-                    <div className="flex flex-col gap-2 w-full max-w-xs mt-2">
-                      <button
-                        onClick={startCamera}
-                        className="w-full text-xs bg-white text-black font-black uppercase tracking-wider py-2.5 border-2 border-black rounded-xl active:scale-95 transition-transform hover:bg-zinc-100"
-                      >
-                        Retry Camera Request
-                      </button>
+            {/* Status overlays */}
+            <AnimatePresence mode="wait">
+              {scanStatus === 'authenticated' && (
+                <motion.div
+                  key="authenticated"
+                  initial={{ scale: 0.96, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.96, opacity: 0 }}
+                  className="absolute inset-0 z-30 flex items-center justify-center"
+                >
+                  <div className="glass-card border-emerald-500/30 p-6 text-center w-[90%]">
+                    <div className="p-3 bg-emerald-500/15 max-w-fit mx-auto rounded-full mb-3 text-emerald-300 border border-emerald-500/30">
+                      <CheckCircle className="w-8 h-8" />
                     </div>
+                    <h3 className="text-[20px] font-semibold text-emerald-300">Wake up verified</h3>
+                    <p className="text-[13px] text-zinc-300 mt-2 leading-relaxed">
+                      Code matches. Great start to your morning.
+                    </p>
                   </div>
-                )}
-
-                {/* Living video scanner stream */}
-                <video
-                  ref={videoRef}
-                  className="w-full h-full object-cover"
-                  playsInline
-                  muted
-                />
-
-                {/* Laser scan lines */}
-                {isCameraActive && (
-                  <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-4">
-                    <div className="absolute inset-x-8 h-1 bg-orange-500 opacity-90 scan-line filter drop-shadow-[0_0_8px_#FF6C35]" />
-
-                    {/* Retro viewfinder corner graphics */}
-                    <div className="absolute top-4 left-4 w-6 h-6 border-t-2 border-l-2 border-white" />
-                    <div className="absolute top-4 right-4 w-6 h-6 border-t-2 border-r-2 border-white" />
-                    <div className="absolute bottom-4 left-4 w-6 h-6 border-b-2 border-l-2 border-white" />
-                    <div className="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-white" />
+                </motion.div>
+              )}
+              {scanStatus === 'wrong-code' && (
+                <motion.div
+                  key="wrong-code"
+                  initial={{ scale: 0.96, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.96, opacity: 0 }}
+                  className="absolute inset-0 z-30 flex items-center justify-center"
+                >
+                  <div className="glass-card border-red-500/30 p-6 text-center w-[90%]">
+                    <div className="p-3 bg-red-500/15 max-w-fit mx-auto rounded-full mb-3 text-red-300 border border-red-500/30">
+                      <Ban className="w-8 h-8" />
+                    </div>
+                    <h3 className="text-[18px] font-semibold text-red-300">Wrong code</h3>
+                    <p className="text-[13px] text-zinc-300 mt-2 leading-relaxed">
+                      That isn't your wake-up code. Walk to it and scan the correct one.
+                    </p>
+                    <p className="text-[11px] text-zinc-500 mt-3 font-medium">
+                      Resuming scan…
+                    </p>
                   </div>
-                )}
-              </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
-              {/* Bottom camera specs strip */}
-              <div className="bg-zinc-900 border-t border-zinc-800/80 p-3 flex justify-between items-center text-[10px] font-mono text-zinc-400">
-                <span className="truncate max-w-[200px]">{cameraLabel}</span>
-                <span className="text-orange-500 font-extrabold animate-pulse">DECODER ACTIVE</span>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          {/* Camera status strip */}
+          <div className="bg-black/60 backdrop-blur-md border-t border-white/[0.06] px-4 py-2.5 flex justify-between items-center text-[11px] text-zinc-400">
+            <span className="truncate max-w-[200px]">{cameraLabel}</span>
+            <span className={`font-medium ${scanStatus === 'wrong-code' ? 'text-red-400' : scanStatus === 'authenticated' ? 'text-emerald-400' : 'text-[#FF8A42]'}`}>
+              {scanStatus === 'wrong-code' ? 'Retrying' : scanStatus === 'authenticated' ? 'Verified' : 'Scanning'}
+            </span>
+          </div>
+        </div>
 
-
-
-        {/* Shouting Voice reminder caption */}
+        {/* Shouter notice */}
         {scanStatus === 'scanning' && alarm.soundType === 'filipino-shout' && (
-          <div className="mt-4 p-3 bg-white border-2 border-black rounded-xl text-xs italic text-center w-full max-w-sm font-bold tracking-wide polish-shadow-sm text-black">
-            💬 Filipino voice shouting activated! Turn off before the neighbors complain!
+          <div className="glass-card border-red-500/20 p-3 rounded-2xl text-[12.5px] text-center w-full max-w-sm text-zinc-300 font-medium">
+            Shouter voice is on — scan your code to stop it.
           </div>
         )}
       </div>
 
-      {/* Escapeless Action Instructions Footer */}
-      <div className="max-w-md w-full mx-auto mt-4 text-center">
-        <div className="p-4 bg-white border-2 border-black rounded-2xl polish-shadow">
-          <p className="text-xs font-black text-black uppercase tracking-tight">How do I shut this off?</p>
-          <p className="text-[11px] text-zinc-700 mt-1 font-semibold leading-relaxed">
-            Physical exercise stops sleep loops: walk to the bathroom, hold your phone up, and focus this camera viewport directly at your printed custom QR poster!
+      {/* Help footer */}
+      <div className="max-w-md w-full mx-auto mt-4 text-center z-10">
+        <div className="glass-card p-4">
+          <p className="text-[13px] font-semibold text-white">How do I turn this off?</p>
+          <p className="text-[12px] text-zinc-400 mt-1.5 leading-relaxed">
+            Walk to your printed QR code and point this camera at it. There's no other way.
           </p>
         </div>
-
-        <div className="mt-4 flex items-center justify-center gap-1.5 text-zinc-500 text-[10px] font-mono uppercase tracking-widest font-bold">
-          <Lock className="w-3.5 h-3.5 text-zinc-650" />
-          <span>Escapes disabled • Hard shutdown locked</span>
-        </div>
       </div>
-
     </div>
   );
 }
