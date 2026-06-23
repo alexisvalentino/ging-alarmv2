@@ -8,10 +8,8 @@ import QRCode from 'qrcode';
 import { jsPDF } from 'jspdf';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Download, FileText, Image, RefreshCw, Printer, AlertOctagon,
-  CheckCircle, ShieldCheck, Dumbbell, Sparkles, AlertTriangle
+  FileText, Image as ImageIcon, RefreshCw, CheckCircle, ChevronRight
 } from 'lucide-react';
-import GingLogo from './GingLogo';
 import { Capacitor, registerPlugin } from '@capacitor/core';
 
 interface GingAndroidPlugin {
@@ -69,7 +67,7 @@ export default function QRCodeManager({ userQRSecret, onRegenerateSecret, onComp
             filename: 'ging-wake-up-qr.png',
             mimeType: 'image/png'
           });
-          triggerToast('PNG Image saved to your Photos/Gallery folder! Print or scan it now!');
+          triggerToast('Saved to Photos. Print it and place it far from your bed.');
           return;
         } catch (nativeErr) {
           console.error("Native PNG save failed, falling back to share sheet:", nativeErr);
@@ -86,10 +84,10 @@ export default function QRCodeManager({ userQRSecret, onRegenerateSecret, onComp
           if (navigator.canShare({ files: [file] })) {
             await navigator.share({
               files: [file],
-              title: 'GING Wake Up QR Code',
-              text: 'Print this QR code and paste it in your bathroom to shut off GING alarm!'
+              title: 'Ging wake-up QR code',
+              text: 'Print this QR code and place it far from your bed.'
             });
-            triggerToast('Share sheet opened successfully!');
+            triggerToast('Share sheet opened.');
             return;
           }
         } catch (e) {
@@ -101,7 +99,7 @@ export default function QRCodeManager({ userQRSecret, onRegenerateSecret, onComp
       link.download = `ging-wake-up-qr.png`;
       link.href = dataUrl;
       link.click();
-      triggerToast('PNG Image Downloaded! Now send it to your computer or print it!');
+      triggerToast('PNG downloaded. Print it to use.');
     } catch (e) {
       console.error(e);
     }
@@ -120,101 +118,73 @@ export default function QRCodeManager({ userQRSecret, onRegenerateSecret, onComp
 
       // A4 is 210 x 297 mm
 
-      // Top Border Accent using Ging Gradient feel
-      doc.setFillColor(255, 108, 53); // orange
-      doc.rect(0, 0, 210, 8, 'F');
-
-      doc.setFillColor(255, 61, 76); // red
-      doc.rect(0, 8, 210, 4, 'F');
+      // Top accent bar (muted Ging orange)
+      doc.setFillColor(255, 138, 66);
+      doc.rect(0, 0, 210, 6, 'F');
 
       // Title & Branding
       doc.setTextColor(20, 20, 20);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(28);
-      doc.text('GING: ANTI-SLEEP ALARM SYSTEM', 105, 30, { align: 'center' });
+      doc.text('Ging', 105, 28, { align: 'center' });
 
       doc.setFontSize(11);
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 100, 100);
-      doc.text('Official Wake Up Manifest & Persistent QR Code sheet', 105, 37, { align: 'center' });
+      doc.setTextColor(110, 110, 110);
+      doc.text('Your wake-up code — print this and place it far from your bed.', 105, 36, { align: 'center' });
 
       // Solid Divider
-      doc.setDrawColor(220, 220, 220);
-      doc.line(20, 45, 190, 45);
+      doc.setDrawColor(225, 225, 225);
+      doc.line(20, 44, 190, 44);
 
-      // Warning Box
-      doc.setFillColor(255, 237, 230); // light cream-orange background
-      doc.rect(20, 52, 170, 32, 'F');
-
-      doc.setDrawColor(255, 108, 53);
-      doc.setLineWidth(0.8);
-      doc.rect(20, 52, 170, 32);
-
-      // Warning content
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(12);
-      doc.setTextColor(230, 60, 40);
-      doc.text('CRITICAL WARNING: DO NOT LEAVE ON YOUR NIGHTSTAND', 105, 59, { align: 'center' });
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9.5);
-      doc.setTextColor(60, 60, 60);
-      doc.text('This QR image is your ONLY way out of the alarm. If you leave this sheet next to your bed,', 105, 67, { align: 'center' });
-      doc.text('you will fall into the snooze trap and fail. Stick it inside your bathroom, on your fridge,', 105, 72, { align: 'center' });
-      doc.text('or at least 10 meters away from your sleeping zone. Force yourself to walk to be set free.', 105, 77, { align: 'center' });
-
-      // QR Code Position (90mm size, centered on page)
+      // QR Code (centered)
       const qrW = 92;
       const qrH = 92;
       const qrX = (210 - qrW) / 2;
-      const qrY = 96;
+      const qrY = 60;
 
-      // Draw QR Border
-      doc.setDrawColor(30, 30, 30);
-      doc.setLineWidth(1.5);
-      doc.rect(qrX - 4, qrY - 4, qrW + 8, qrH + 8);
+      doc.setDrawColor(235, 235, 235);
+      doc.setLineWidth(0.6);
+      doc.roundedRect(qrX - 5, qrY - 5, qrW + 10, qrH + 10, 2, 2);
 
       // Inject QR Code Image
       doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrW, qrH);
 
-      // Labels below QR Code
+      // Secret label
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(30, 30, 30);
-      doc.text(`SECURITY_KEY: ${userQRSecret}`, 105, 202, { align: 'center' });
+      doc.setFontSize(11);
+      doc.setTextColor(40, 40, 40);
+      doc.text(userQRSecret, 105, qrY + qrH + 14, { align: 'center' });
 
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(8.5);
-      doc.setTextColor(120, 120, 120);
-      doc.text('Verification Code generated by Ging OS Cryptography module', 105, 207, { align: 'center' });
+      // How-to box
+      const boxY = qrY + qrH + 28;
+      doc.setFillColor(250, 250, 250);
+      doc.roundedRect(20, boxY, 170, 46, 2, 2, 'F');
+      doc.setDrawColor(230, 230, 230);
+      doc.roundedRect(20, boxY, 170, 46, 2, 2);
 
-      // Footer divider
-      doc.setDrawColor(240, 240, 240);
-      doc.line(30, 240, 180, 240);
-
-      // Step by Step printing guides
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
+      doc.setFontSize(11);
       doc.setTextColor(20, 20, 20);
-      doc.text('HOW TO CONFIGURE:', 30, 248);
+      doc.text('How to set up', 28, boxY + 10);
 
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(80, 80, 80);
-      doc.text('1. Print this A4 PDF directly on paper (use black or color ink).', 30, 254);
-      doc.text('2. Clip or stick it on your bathroom mirror, refrigerator, or outer kitchen cabinet.', 30, 259);
-      doc.text('3. Set an alarm in the Ging App. In the morning, you must carry your phone to this paper to stop it.', 30, 264);
+      doc.setFontSize(9.5);
+      doc.setTextColor(90, 90, 90);
+      doc.text('1.  Print this PDF.', 28, boxY + 20);
+      doc.text('2.  Stick it on your bathroom mirror, fridge, or anywhere far from bed.', 28, boxY + 27);
+      doc.text('3.  Set an alarm in Ging. To turn it off, walk to this paper and scan it.', 28, boxY + 34);
 
-      // Branding stamp on side
-      doc.setFillColor(30, 30, 30);
+      // Footer
+      doc.setFillColor(20, 20, 20);
       doc.rect(0, 280, 210, 17, 'F');
 
       doc.setTextColor(255, 255, 255);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
-      doc.text('GING APP — GISISING KA KAHIT AYAW MO PA', 105, 290, { align: 'center' });
+      doc.text('Ging — the alarm that makes you get up.', 105, 290, { align: 'center' });
 
-      // Native Mobile Fallback: Save directly to device storage if on native platform
+      // Native Mobile: Save directly to device storage
       if (Capacitor.isNativePlatform()) {
         try {
           const pdfBase64 = doc.output('datauristring').split(',')[1];
@@ -223,14 +193,14 @@ export default function QRCodeManager({ userQRSecret, onRegenerateSecret, onComp
             filename: 'ging-wake-up-sheet.pdf',
             mimeType: 'application/pdf'
           });
-          triggerToast('PDF Sheet saved to your Downloads/Ging/ folder! Send to printer now!');
+          triggerToast('PDF saved to Downloads. Send it to a printer.');
           return;
         } catch (nativeErr) {
           console.error("Native PDF save failed, falling back to share sheet:", nativeErr);
         }
       }
 
-      // Native Mobile Fallback: Attempt Web Share API to easily send or print PDF document
+      // Web Share API fallback
       if (navigator.share && navigator.canShare) {
         try {
           const pdfBlob = doc.output('blob');
@@ -238,10 +208,10 @@ export default function QRCodeManager({ userQRSecret, onRegenerateSecret, onComp
           if (navigator.canShare({ files: [file] })) {
             await navigator.share({
               files: [file],
-              title: 'GING Wake Up Sheet PDF',
-              text: 'Print this A4 PDF sheet and paste it in your bathroom!'
+              title: 'Ging wake-up sheet',
+              text: 'Print this sheet and place it far from your bed.'
             });
-            triggerToast('Share sheet opened successfully!');
+            triggerToast('Share sheet opened.');
             return;
           }
         } catch (e) {
@@ -251,7 +221,7 @@ export default function QRCodeManager({ userQRSecret, onRegenerateSecret, onComp
 
       // Save PDF
       doc.save(`ging-wake-up-sheet.pdf`);
-      triggerToast('PDF Sheet Downloaded! Perfect for clean high-res paper printing!');
+      triggerToast('PDF downloaded. Print it to use.');
     } catch (e) {
       console.error(e);
     }
@@ -263,127 +233,109 @@ export default function QRCodeManager({ userQRSecret, onRegenerateSecret, onComp
   };
 
   return (
-    <div className="relative min-h-screen bg-gray-50 text-black flex flex-col justify-between p-6 overflow-x-hidden font-sans">
+    <div className="relative min-h-screen ambient-glow-bg text-white flex flex-col p-6 overflow-x-hidden font-sans">
+      {/* Ambient haze */}
+      <div className="glow-sphere-orange top-[-10%] left-[-15%]" />
+      <div className="glow-sphere-red bottom-[-15%] right-[-10%]" />
 
-      {/* Upper Brand Badge */}
-      <div className="max-w-md w-full mx-auto flex items-center justify-between py-3 border-b-2 border-black">
-        <div className="flex items-center gap-2">
-          <GingLogo size={36} />
-          <span className="font-sans font-black text-xl tracking-wider text-black uppercase">Ging Code</span>
-        </div>
-        <span className="text-[10px] font-mono font-black text-emerald-800 uppercase tracking-widest bg-emerald-100 px-3 py-1 rounded border-2 border-black polish-shadow-sm">
-          COMPILER READY
-        </span>
+      {/* Header */}
+      <div className="max-w-md w-full mx-auto py-2 z-10">
+        <h1 className="text-[28px] font-bold tracking-tight text-white">Wake-up code</h1>
+        <p className="text-[13px] text-zinc-400 mt-1 leading-relaxed">
+          Print this and place it far from your bed — it's the only way to turn an alarm off.
+        </p>
       </div>
 
-      {/* Main Core View */}
-      <div className="flex-1 max-w-md w-full mx-auto py-8 flex flex-col items-center justify-center">
+      {/* Main content */}
+      <div className="flex-1 max-w-md w-full mx-auto flex flex-col items-center z-10 mt-6 space-y-6">
 
-        <div className="text-center mb-6">
-          <h2 className="text-xl font-black tracking-tight text-black flex items-center justify-center gap-2 uppercase">
-            2. Your Wake-Up Shield
-            <Dumbbell className="w-5 h-5 text-red-600" />
-          </h2>
-          <p className="text-zinc-600 text-xs mt-2 leading-relaxed font-semibold">
-            This QR verification key is randomized for ultimate anti-sleep override. Print this out right now to secure your escape:
-          </p>
-        </div>
-
-        {/* QR Code Container styled with crisp flat borders and solid black shadow */}
-        <div className="p-6 bg-white border-2 border-black rounded-3xl flex flex-col items-center relative w-full max-w-[290px] mx-auto overflow-hidden polish-shadow">
-          {/* Retro corner accents */}
-          <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-black" />
-          <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-black" />
-          <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-black" />
-          <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-black" />
-
-          {/* Canvas container */}
-          <div className="p-3 bg-white rounded-2xl border-2 border-black relative">
+        {/* QR Code card */}
+        <div className="glass-card rounded-2xl p-6 w-full flex flex-col items-center">
+          <div className="p-3 bg-white rounded-xl relative shadow-lg">
             {isGenerating && (
-              <div className="absolute inset-0 bg-white/95 flex items-center justify-center">
-                <RefreshCw className="w-6 h-6 text-orange-600 animate-spin" />
+              <div className="absolute inset-0 bg-white/95 flex items-center justify-center rounded-xl">
+                <RefreshCw className="w-6 h-6 text-[#FF8A42] animate-spin" />
               </div>
             )}
-            <canvas ref={canvasRef} className="w-48 h-48 block" />
+            <canvas ref={canvasRef} className="w-44 h-44 block rounded-lg" />
           </div>
 
           <div className="mt-4 flex flex-col items-center text-center">
-            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest font-black">
-              System Cryptography Signature
-            </span>
-            <span className="text-xs font-mono font-black text-orange-600 tracking-wider mt-1 break-all max-w-[240px]">
+            <span className="text-[11px] text-zinc-500 uppercase tracking-wide">Your code</span>
+            <span className="text-[13px] font-mono font-semibold text-[#FFB37A] tracking-wider mt-1 break-all max-w-[240px]">
               {userQRSecret}
             </span>
           </div>
         </div>
 
-        {/* Regenerator key button */}
-        <button
-          onClick={onRegenerateSecret}
-          className="mt-4 flex items-center gap-1.5 text-xs text-black font-black uppercase tracking-wider bg-white hover:bg-zinc-100 px-3.5 py-2 rounded-full border-2 border-black polish-shadow-sm active:translate-y-[1px] active:shadow-none"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>Regenerate Key</span>
-        </button>
+        {/* Actions grouped list */}
+        <div className="glass-card rounded-2xl w-full divide-y divide-white/[0.06] overflow-hidden">
+          <button
+            onClick={onRegenerateSecret}
+            className="w-full flex items-center gap-3 px-4 py-3.5 cursor-pointer transition-colors hover:bg-white/[0.04] active:bg-white/[0.06]"
+          >
+            <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center">
+              <RefreshCw className="w-3.5 h-3.5 text-[#FF8A42]" />
+            </div>
+            <span className="text-[15px] text-white font-medium flex-1 text-left">Regenerate code</span>
+            <ChevronRight className="w-4 h-4 text-zinc-500" />
+          </button>
 
-        {/* Informative advice warning block */}
-        <div className="mt-6 w-full p-4 bg-white border-2 border-black rounded-2xl flex gap-3 polish-shadow">
-          <AlertOctagon className="w-6 h-6 text-red-600 shrink-0 mt-0.5" />
-          <div className="text-xs text-zinc-800 space-y-1">
-            <span className="font-black text-black block uppercase tracking-tight">RUTHLESS RULE #1: DO NOT TAMPER</span>
-            <p className="font-semibold leading-relaxed">Do NOT save this on your local laptop screen or photo gallery. Download and PRINT it, then paste it on your <span className="text-orange-600 underline">bathroom cabinet mirror</span>. Moving physically turns on biological alarm overrides.</p>
-          </div>
-        </div>
-
-        {/* Download Action Matrix with robust retro design parameters */}
-        <div className="w-full mt-6 grid grid-cols-2 gap-4">
           <button
             onClick={downloadPNG}
-            className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white border-2 border-black hover:bg-orange-50 hover:text-black transition-colors text-center group cursor-pointer polish-shadow"
+            className="w-full flex items-center gap-3 px-4 py-3.5 cursor-pointer transition-colors hover:bg-white/[0.04] active:bg-white/[0.06]"
           >
-            <Image className="w-6 h-6 text-orange-600 mb-2 group-hover:scale-110 transition-transform" />
-            <span className="text-xs font-black text-black">Download PNG</span>
-            <span className="text-[9px] text-zinc-500 font-bold mt-1 uppercase">Image for backup</span>
+            <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center">
+              <ImageIcon className="w-3.5 h-3.5 text-[#FF8A42]" />
+            </div>
+            <div className="flex-1 text-left">
+              <span className="text-[15px] text-white font-medium block">Save image</span>
+              <span className="text-[11px] text-zinc-500">PNG — save to Photos</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-zinc-500" />
           </button>
 
           <button
             onClick={downloadPDF}
-            className="flex flex-col items-center justify-center p-4 rounded-2xl bg-white border-2 border-black hover:bg-orange-50 hover:text-black transition-colors text-center group cursor-pointer polish-shadow"
+            className="w-full flex items-center gap-3 px-4 py-3.5 cursor-pointer transition-colors hover:bg-white/[0.04] active:bg-white/[0.06]"
           >
-            <FileText className="w-6 h-6 text-red-650 mb-2 group-hover:scale-110 transition-transform" />
-            <span className="text-xs font-black text-black">Download PDF</span>
-            <span className="text-[9px] text-zinc-500 font-bold mt-1 uppercase">Print Sheet (A4)</span>
+            <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center">
+              <FileText className="w-3.5 h-3.5 text-[#FF8A42]" />
+            </div>
+            <div className="flex-1 text-left">
+              <span className="text-[15px] text-white font-medium block">Print sheet</span>
+              <span className="text-[11px] text-zinc-500">A4 PDF — ready to print</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-zinc-500" />
           </button>
         </div>
 
-        {/* Success toast notification panel */}
+        {/* Success toast */}
         <AnimatePresence>
           {downloadSuccess && (
             <motion.div
-              initial={{ y: 20, opacity: 0 }}
+              initial={{ y: 16, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 20, opacity: 0 }}
-              className="mt-4 p-3 bg-green-50 border-2 border-green-600 rounded-xl text-xs text-green-950 flex items-start gap-2 max-w-sm w-full font-bold"
+              exit={{ y: 16, opacity: 0 }}
+              className="w-full glass-card border-emerald-500/25 p-3.5 rounded-2xl text-[13px] text-emerald-300 flex items-start gap-2.5 font-medium"
             >
-              <CheckCircle className="w-4 h-4 text-green-700 shrink-0 mt-0.5" />
+              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
               <span>{downloadSuccess}</span>
             </motion.div>
           )}
         </AnimatePresence>
-
       </div>
 
-      {/* Primary Proceed CTA Footer */}
-      <div className="max-w-md w-full mx-auto mt-6">
+      {/* Continue CTA */}
+      <div className="max-w-md w-full mx-auto mt-6 z-10">
         <button
           onClick={onComplete}
-          className="w-full py-4 rounded-2xl bg-gradient-to-r from-orange-500 via-orange-600 to-red-700 text-white font-sans font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer border-2 border-black polish-shadow active:translate-y-1 active:shadow-none"
+          className="w-full py-4 rounded-2xl glass-button-glow font-sans font-semibold text-[15px] flex items-center justify-center gap-2 cursor-pointer transition-all"
         >
-          <span>Complete Alarm Setup & Open Ging Panel</span>
-          <ShieldCheck className="w-4 h-4" />
+          <span>Done</span>
+          <ChevronRight className="w-4 h-4" />
         </button>
       </div>
-
     </div>
   );
 }
