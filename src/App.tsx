@@ -291,7 +291,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 select-none">
+    <div className="min-h-screen bg-black select-none">
       {state.currentView === 'splash' && (
         <Splash onContinue={handleCompleteSplash} />
       )}
