@@ -8,15 +8,15 @@ interface GingLogoProps {
 export default function GingLogo({ className = '', size = 160 }: GingLogoProps) {
   return (
     <div 
-      className={`relative flex items-center justify-center select-none ${className}`}
-      style={{ width: size, height: size }}
+      className={`relative flex items-center justify-center select-none overflow-hidden ${className}`}
+      style={{ width: size, height: size, borderRadius: '22.37%' }}
       id="ging-logo-container"
     >
       <img
         src="/logo.png"
         alt="Ging Logo"
         referrerPolicy="no-referrer"
-        className="w-full h-full object-contain"
+        className="w-full h-full object-cover"
         id="ging-logo-img"
         onError={(e) => {
           console.warn("Ging logo.png load warning; verifying source in public directory.", e);

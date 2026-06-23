@@ -175,7 +175,6 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
       <div className="max-w-md w-full mx-auto flex items-center justify-between py-3 border-b border-white/[0.06] z-10">
         <div className="flex items-center gap-2">
           <GingLogo size={32} />
-          <span className="font-sans font-semibold text-[17px] text-white tracking-tight">Ging</span>
         </div>
         <span className="text-[13px] font-medium text-zinc-400">
           {grantedCount}/{permissions.length}

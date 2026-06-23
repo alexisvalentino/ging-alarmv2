@@ -40,15 +40,6 @@ export default function Splash({ onContinue }: SplashProps) {
           <GingLogo size={88} />
         </motion.div>
 
-        <motion.h1
-          initial={{ y: 10, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.15, duration: 0.6 }}
-          className="font-sans font-semibold text-[2.5rem] leading-none text-white tracking-tight mt-6"
-        >
-          Ging
-        </motion.h1>
-
         <motion.p
           initial={{ y: 10, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
