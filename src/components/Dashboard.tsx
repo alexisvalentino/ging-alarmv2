@@ -19,7 +19,7 @@ const formatTo12Hour = (time24: string) => {
   const [hoursStr, minutesStr] = parts;
   let hours = parseInt(hoursStr, 10);
   if (isNaN(hours)) return time24;
-  const ampm = hours >= 12 ? 'AM' : 'PM';
+  const ampm = hours >= 12 ? 'PM' : 'AM';
   hours = hours % 12;
   hours = hours ? hours : 12;
   return `${hours}:${minutesStr} ${ampm}`;
@@ -304,6 +304,7 @@ export default function Dashboard({
                                 : 'border-white/[0.06] bg-white/[0.03]'
                             }`}
                           >
+                            {/* Tapping the label selects this sound */}
                             <button
                               type="button"
                               onClick={() => setNewSoundType(snd.key as Alarm['soundType'])}
@@ -311,9 +312,13 @@ export default function Dashboard({
                             >
                               {snd.label}
                             </button>
+                            {/* Preview button also selects this sound, then plays it */}
                             <button
                               type="button"
-                              onClick={() => handlePreviewSound(snd.key)}
+                              onClick={() => {
+                                setNewSoundType(snd.key as Alarm['soundType']);
+                                handlePreviewSound(snd.key);
+                              }}
                               className={`p-1.5 rounded-lg border transition-colors shrink-0 ${
                                 isPreviewing
                                   ? 'bg-[#FF8A42]/20 border-[#FF8A42]/40 text-[#FFB37A]'
