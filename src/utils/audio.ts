@@ -41,8 +41,6 @@ class GingAudioEngine {
       this.startClassicBeep(volume);
     } else if (soundType === 'air-horn') {
       this.startAirHorn(volume);
-    } else if (soundType === 'filipino-shout') {
-      this.startFilipinoShout(volume);
     } else {
       this.startIndustrial(volume);
     }
@@ -133,36 +131,6 @@ class GingAudioEngine {
     hornLfo.start();
     this.oscillator1.start();
     this.oscillator2.start();
-  }
-
-  private startFilipinoShout(volume: number) {
-    // Combine an industrial buzzer with persistent Filipino TTS nagging
-    this.startIndustrial(volume * 0.4); // slightly lower buzzer to hear voice clearly
-
-    const speak = () => {
-      if (!this.isPlaying) return;
-      const phrases = [
-        "OY! Gising na! Tanghali na naman, babangon ka ba o tamad ka na naman?",
-        "Bumangon ka na diyan sa kama! I-scan mo ang QR code para tumahimik ako!",
-        "Hoy! Wala kang mararating kung lagi kang natutulog! Gising!",
-        "Gising na gising na! Ging Alarm na! Tumayo ka na at pumunta sa QR code mo!",
-        "Hala! Scan mo na yung QR code kung ayaw mong mabitin sa pangarap mo!"
-      ];
-      const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)];
-      
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(randomPhrase);
-        utterance.lang = 'tl-PH'; // Tagalog (Filipino)
-        utterance.rate = 1.1; // speak quickly and urgently
-        utterance.pitch = 1.1; // anxious pitch
-        utterance.volume = volume;
-        window.speechSynthesis.speak(utterance);
-      }
-    };
-
-    speak();
-    this.speechInterval = window.setInterval(speak, 5000); // remind every 5 seconds
   }
 
   public stop() {

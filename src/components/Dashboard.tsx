@@ -6,11 +6,10 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Plus, Trash2, BellOff, Play, Square, QrCode, X, Minus
+  Plus, BellOff, Play, Square, QrCode, X, Minus
 } from 'lucide-react';
 import { Alarm } from '../types';
 import { gingAudio } from '../utils/audio';
-import GingLogo from './GingLogo';
 import TimeWheelPicker from './TimeWheelPicker';
 
 const formatTo12Hour = (time24: string) => {
@@ -39,7 +38,6 @@ const SOUND_LABELS: { key: Alarm['soundType']; label: string }[] = [
   { key: 'industrial', label: 'Industrial' },
   { key: 'classic-beep', label: 'Beep' },
   { key: 'air-horn', label: 'Air Horn' },
-  { key: 'filipino-shout', label: 'Shouter' }
 ];
 
 const soundLabel = (key: Alarm['soundType']) =>
@@ -59,24 +57,20 @@ const repeatSummary = (days: number[]): string => {
 
 interface DashboardProps {
   alarms: Alarm[];
-  streak: number;
   userQRSecret: string;
   onAddAlarm: (alarm: Omit<Alarm, 'id'>) => void;
   onToggleAlarm: (id: string) => void;
   onDeleteAlarm: (id: string) => void;
   onNavigateToQR: () => void;
-  onResetStreak: () => void;
 }
 
 export default function Dashboard({
   alarms,
-  streak,
   userQRSecret,
   onAddAlarm,
   onToggleAlarm,
   onDeleteAlarm,
   onNavigateToQR,
-  onResetStreak
 }: DashboardProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -225,7 +219,7 @@ export default function Dashboard({
           </div>
         )}
 
-        {/* Quiet footer: streak + wake-up code (features preserved, kept out of the way) */}
+        {/* Quiet footer: wake-up code link */}
         <div className="mt-8 flex items-center justify-between px-1">
           <button
             onClick={onNavigateToQR}
@@ -234,18 +228,6 @@ export default function Dashboard({
             <QrCode className="w-4 h-4 text-[#FF8A42]" />
             <span>Wake-up code</span>
           </button>
-
-          {streak > 0 ? (
-            <button
-              onClick={onResetStreak}
-              className="text-[13px] text-zinc-400 font-medium hover:text-red-400 transition-colors"
-              title="Tap to reset streak"
-            >
-              {streak} day streak
-            </button>
-          ) : (
-            <span className="text-[13px] text-zinc-600 font-medium">{streak} day streak</span>
-          )}
         </div>
       </div>
 
@@ -292,35 +274,6 @@ export default function Dashboard({
                   {/* Time picker — iOS scroll wheel */}
                   <div className="glass-card py-5 flex justify-center">
                     <TimeWheelPicker value={newTime} onChange={setNewTime} />
-                  </div>
-
-                  {/* Quick presets */}
-                  <div>
-                    <label className="block text-[12px] font-medium text-zinc-400 mb-2">Quick times</label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {[
-                        { time: '05:00', label: '5:00' },
-                        { time: '05:30', label: '5:30' },
-                        { time: '06:00', label: '6:00' },
-                        { time: '06:30', label: '6:30' },
-                        { time: '07:00', label: '7:00' },
-                        { time: '07:30', label: '7:30' },
-                        { time: '08:00', label: '8:00' },
-                      ].map((preset) => (
-                        <button
-                          key={preset.time}
-                          type="button"
-                          onClick={() => setNewTime(preset.time)}
-                          className={`px-3 py-1.5 rounded-full text-[12px] font-medium transition-all ${
-                            newTime === preset.time
-                              ? 'glass-button-glow'
-                              : 'glass-button text-zinc-300'
-                          }`}
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
                   </div>
 
                   {/* Label */}

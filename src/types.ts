@@ -10,7 +10,7 @@ export interface Alarm {
   active: boolean;
   days: number[]; // 0 = Sunday, 1 = Monday, etc.
   volume: number; // 0 to 1
-  soundType: 'industrial' | 'classic-beep' | 'air-horn' | 'filipino-shout';
+  soundType: 'industrial' | 'classic-beep' | 'air-horn';
   qrSecret: string; // The specific QR code secret this alarm requires to turn off
 }
 

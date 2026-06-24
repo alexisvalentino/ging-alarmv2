@@ -439,13 +439,6 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
             </span>
           </div>
         </div>
-
-        {/* Shouter notice */}
-        {scanStatus === 'scanning' && alarm.soundType === 'filipino-shout' && (
-          <div className="glass-card border-red-500/20 p-3 rounded-2xl text-[12.5px] text-center w-full max-w-sm text-zinc-300 font-medium">
-            Shouter voice is on — scan your code to stop it.
-          </div>
-        )}
       </div>
 
       {/* Help footer */}

@@ -282,10 +282,6 @@ export default function App() {
     }
   };
 
-  const handleResetStreak = () => {
-    setState(prev => ({ ...prev, streak: 0 }));
-  };
-
   const handleNavigateToQR = () => {
     setState(prev => ({ ...prev, currentView: 'setup-qr' }));
   };
@@ -315,13 +311,11 @@ export default function App() {
       {state.currentView === 'dashboard' && (
         <Dashboard
           alarms={state.alarms}
-          streak={state.streak}
           userQRSecret={state.userQRSecret}
           onAddAlarm={handleAddAlarm}
           onToggleAlarm={handleToggleAlarm}
           onDeleteAlarm={handleDeleteAlarm}
           onNavigateToQR={handleNavigateToQR}
-          onResetStreak={handleResetStreak}
         />
       )}
 
