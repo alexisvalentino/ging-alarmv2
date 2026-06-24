@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="public/logo.png" alt="Ging Logo" width="120" />
-</p>
-
 <h1 align="center">Ging — QR Alarm Clock</h1>
 
 <p align="center">
@@ -9,7 +5,7 @@
 </p>
 
 <p align="center">
-  <em>Named after the Filipino word <strong>"gising"</strong> (wake up)</em>
+  <em>Named after the Filipino word <strong>"gising"</strong> — to wake up.</em>
 </p>
 
 <p align="center">
@@ -20,192 +16,262 @@
   <img src="https://img.shields.io/badge/Android_Studio-Ready-3DDC84?logo=android-studio&logoColor=white" alt="Android Studio" />
 </p>
 
----
-
-## 📖 What is Ging?
-
-**Ging** is a ruthless alarm clock app that forces you to physically get out of bed. Unlike normal alarms where you can just hit snooze, Ging **won't stop ringing** until you walk to your bathroom (or wherever you placed your printed QR code) and scan it with your phone's camera.
-
-The idea is simple: **if you're already standing in the bathroom, you're already awake.**
-
-### Key Features
-
-- 🔊 **4 Aggressive Alarm Sounds** — Screaming Industrial siren, Retro Watch beep, Railway Air Horn, or a Filipino voice literally shouting at you to get up
-- 📱 **QR Code Lock** — Alarm can ONLY be dismissed by scanning your unique printed QR code
-- 🔥 **Wake-Up Streak Tracker** — Track consecutive days you successfully woke up on time
-- 🖨️ **Print-Ready QR Sheet** — Download your QR code as PNG or a full A4 PDF poster
-- 📅 **Per-Day Scheduling** — Set different alarms for different days of the week
-- 🔒 **Anti-Bypass Protection** — On Android: locks volume to max, displays over lock screen, prevents app killing
-- 🇵🇭 **Filipino Shouter Mode** — A Tagalog TTS voice nags you every 5 seconds until you get up
+<p align="center">
+  <img src="assets/icon.png" alt="Ging Logo" width="120" />
+</p>
 
 ---
 
-## 🔧 How It Works
+## Overview
 
-### 1. Setup Your QR Code
-When you first open Ging, it generates a unique QR code tied to your alarms. You **download and print** this QR code, then stick it somewhere far from your bed — like your bathroom mirror, fridge, or hallway.
+**Ging** is an alarm clock that forces you to physically get out of bed. Unlike a normal alarm where you tap snooze, Ging **will not stop ringing** until you walk to your printed QR code and scan it with your phone's camera.
 
-### 2. Set Your Alarm
-Configure your wake-up time, pick which days it should ring, and choose your alarm sound intensity level.
+The logic is simple: **if you are already on your feet in front of the QR code, you are already awake.**
 
-### 3. Wake Up & Scan
-When the alarm fires, your phone starts blasting sound at maximum volume. The **only way to shut it off** is to:
-1. Get out of bed
-2. Walk to where your QR code is posted
-3. Hold your phone camera up to scan it
-
-Once the QR code matches — silence. Streak updated. ☕
-
-### 4. Download Options
-Your unique QR code can be saved in two formats:
-- **PNG Image** — For quick sharing or digital backup
-- **PDF A4 Sheet** — A print-ready poster with instructions, perfect for sticking on your bathroom mirror
+The interface follows an Apple iOS-inspired glassmorphic dark theme — clean, minimal, and consistent across every screen.
 
 ---
 
-## 🛠️ Tech Stack
+## How It Works
+
+1. **Generate your wake-up code.** On first launch, Ging generates a unique QR code bound to your alarms. Download it as a PNG or a print-ready A4 PDF and stick it somewhere far from your bed — a bathroom mirror, fridge, or hallway.
+2. **Set your alarm.** Pick the time with the iOS-style scroll wheel, choose the repeat days, and select an alarm sound.
+3. **Wake up and scan.** When the alarm fires, it blasts sound at maximum volume. The only way to dismiss it is to walk to your QR code and hold your camera up to it. When the scanned code matches, the alarm stops.
+
+There is no snooze button, no dismiss-on-tap, and no silent way out. The alarm rings continuously until the correct code is scanned.
+
+---
+
+## Features
+
+- **QR Code Lock** — The alarm can only be dismissed by scanning the unique printed QR code tied to your account.
+- **Three Alarm Sounds** — Industrial siren, Classic high-pitch beep, and Air Horn. All synthesized procedurally via the Web Audio API, so there are no audio files to ship. Each sound can be previewed before saving.
+- **iOS-Style Scroll Wheel Time Picker** — A three-column snap-scrolling wheel (hour, minute, AM/PM) for setting times precisely.
+- **Per-Day Scheduling** — Choose which days of the week each alarm rings (every day, weekdays, weekends, or custom).
+- **Print-Ready QR Sheet** — Export your wake-up code as a PNG image or a full A4 PDF poster with setup instructions.
+- **Anti-Bypass Protection (Android)** — Locks volume to maximum, displays over the lock screen and other apps, and resists Android's memory/battery killers while the alarm is active.
+- **Persistent State** — All alarms, permissions, and your QR secret are saved locally on the device via a single localStorage key, so they survive app restarts.
+
+---
+
+## Design Language
+
+The entire app uses a fixed **dark glassmorphic** design system inspired by iOS:
+
+- Pure black background with ambient color glow (muted Ging orange `#FF8A42` and iOS red `#FF453A`).
+- Translucent glass surfaces with heavy backdrop blur, hairline borders, and grouped list rows (like iOS Settings).
+- System-first font stack (`-apple-system, BlinkMacSystemFont, "SF Pro Text"`).
+- Squircle app logo (iOS `border-radius` ratio) on the splash and header.
+- The theme is intentionally dark-only and does not adapt to light mode — the glow and blur effects are built around a black canvas.
+
+---
+
+## Tech Stack
 
 | Technology | Purpose |
-|-----------|---------|
-| **React 19** | UI framework & component architecture |
+|------------|---------|
+| **React 19** | UI framework and component architecture |
 | **TypeScript** | Type-safe application logic |
-| **Vite 6** | Lightning-fast dev server & production bundler |
-| **Tailwind CSS 4** | Utility-first styling |
-| **Capacitor 8** | Native Android wrapper (camera, audio, battery, overlay permissions) |
-| **jsQR** | Real-time QR code scanning from camera frames |
+| **Vite 6** | Dev server and production bundler |
+| **Tailwind CSS 4** | Utility-first styling (configured via `@theme` in `index.css`, no config file) |
+| **Framer Motion** | Animations and transitions |
+| **Capacitor 8** | Native Android wrapper (camera, audio, battery, overlay) |
+| **jsQR** | Real-time QR decoding from camera frames |
 | **qrcode** | QR code generation rendered to canvas |
 | **jsPDF** | PDF generation for printable QR sheets |
-| **Framer Motion** | Smooth animations and transitions |
-| **Lucide React** | Crisp icon set |
-| **Web Speech API** | Text-to-speech for Filipino Shouter mode |
-| **Web Audio API** | Procedural alarm sound synthesis (no audio files needed) |
+| **Lucide React** | Icon set |
+| **Web Audio API** | Procedural alarm sound synthesis (no audio files) |
+
+A custom Capacitor plugin (`GingAndroid`) bridges to native Android capabilities that the web layer cannot reach on its own.
 
 ---
 
-## 🚀 Getting Started
+## Custom Native Plugin — GingAndroid
+
+The app registers a custom Capacitor plugin named **GingAndroid** that exposes the following native methods:
+
+| Method | Purpose |
+|--------|---------|
+| `setAlarmActive({ active })` | Locks/unlocks the Android back-button and system-exit behavior during ringing |
+| `forceMaxVolume()` | Forces the system speaker volume to 100% (called on a 2.5s loop while ringing) |
+| `requestOverlayPermission()` / `checkOverlayPermission()` | Request and verify "display over other apps" |
+| `requestBatteryBypass()` / `checkBatteryBypass()` | Request and verify battery-optimization exemption |
+| `saveBase64File({ base64Data, filename, mimeType })` | Saves a generated PNG or PDF directly to device storage |
+
+These are implemented in the native Kotlin code under `android/app/src/main/java`.
+
+---
+
+## Permissions
+
+Ging requests six permissions during onboarding, presented as an iOS Settings grouped list. Each row can be expanded for a detailed explanation.
+
+| Key | Permission | Why it is needed |
+|-----|------------|------------------|
+| `camera` | Camera | Reads and decodes the QR code locally via an on-device pipeline |
+| `audio` | Web Audio Autoplay | Unlocks the audio channel so the alarm sounds immediately at full volume |
+| `overlay` | Display Over Other Windows | Keeps the alarm on top of the lock screen and other apps so it cannot be swiped away |
+| `battery` | Ignore Battery Optimizations | Keeps Ging's scheduler running during Android deep sleep so the alarm fires on time |
+| `lockscreen` | Wake Lock Screen | Wakes and illuminates the screen when the alarm fires, even when locked |
+| `notification` | Foreground Service | Keeps a lightweight service alive so Android's memory cleaner does not kill the alarm |
+
+The Continue button is disabled until all six are granted. Native permissions (overlay, battery) are re-checked automatically on app focus and on a 2.5-second polling interval.
+
+---
+
+## App Flow
+
+The app is a single state machine in `App.tsx` driven by `currentView`:
+
+```
+splash  ->  permissions  ->  setup-qr  ->  dashboard  <->  ringing
+   |            |               |             |
+   |            |               |             +-- trigger alarm
+   |            |               |
+   |            |               +-- regenerate / download QR
+   |            |
+   |            +-- grant all 6 permissions to continue
+   |
+   +-- auto-advances after 3.8s, or tap Get Started
+```
+
+A scheduler in `App.tsx` evaluates active alarms every 12 seconds against the current device time and day, and transitions to `ringing` when a match is found. Once the QR scan succeeds, control returns to `dashboard`.
+
+---
+
+## Getting Started
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) v18+
-- npm (comes with Node.js)
+- [Node.js](https://nodejs.org/) v18 or later
+- npm (bundled with Node.js)
 
 ### Install Dependencies
 ```bash
 npm install
 ```
 
-### Run Development Server
+### Run the Development Server
 ```bash
 npm run dev
 ```
-The app will be available at `http://localhost:3000`.
+The app is served at `http://localhost:3000` and is also exposed on your LAN (`--host=0.0.0.0`).
+
+> Note: The dev server's HMR can be disabled by setting `DISABLE_HMR=true` in the environment.
 
 ### Build for Production
 ```bash
 npm run build
 ```
-Outputs optimized files to the `dist/` directory.
+Outputs optimized assets to the `dist/` directory.
 
 ---
 
-## 📱 Building for Android (Android Studio)
+## Building for Android (Android Studio)
 
-Ging uses **Capacitor** to wrap the web app into a native Android APK. Follow these steps to compile and run it on a real device or emulator.
+Ging uses **Capacitor** to wrap the web build into a native Android app (`appId: com.ging.alarm`). The Android project lives in the `android/` folder.
 
-### Step 1: Build Web Assets
+### Step 1 — Build the web assets
 ```bash
 npm run build
 ```
 
-### Step 2: Sync to Android Project
+### Step 2 — Sync into the Android project
 ```bash
-npx cap sync
+npx cap sync android
 ```
-This copies the compiled `dist/` files into the `android/` project folder.
+This copies the compiled `dist/` files and the Capacitor config into `android/app/src/main/assets/public`.
 
-### Step 3: Open in Android Studio
+### Step 3 — Open in Android Studio
 ```bash
 npx cap open android
 ```
-Or manually open the `/android` folder in Android Studio.
+Or open the `android/` folder directly in Android Studio.
 
-### Step 4: Run on Device/Emulator
-In Android Studio, click **Run ▶** (or `Shift + F10`) to build the APK and deploy it.
+### Step 4 — Run on a device or emulator
+In Android Studio, click **Run** (or press `Shift + F10`) to build the APK and deploy it.
 
-### Updating After Code Changes
-Whenever you edit your React/TypeScript source code:
+### Updating after code changes
+Whenever you edit the React/TypeScript source, repeat the sync loop:
+
 ```
-Edit code → npm run build → npx cap sync → Run in Android Studio
+edit code  ->  npm run build  ->  npx cap sync android  ->  Run in Android Studio
 ```
 
-> **Note:** Edit your source code in VS Code or your preferred editor — not in Android Studio. Android Studio is only used for compiling and deploying the native Android build.
+> Edit source code in your preferred editor (VS Code, etc.), not in Android Studio. Android Studio is only used to compile and deploy the native build.
 
-For more detailed Android integration instructions, see [ANDROID_STUDIO_GUIDE.md](ANDROID_STUDIO_GUIDE.md).
+For a more detailed walkthrough of the Android setup, device developer mode, and troubleshooting, see [android_studio_guide.md](android_studio_guide.md).
 
 ---
 
-## 📂 Project Structure
-
-```
-ging/
-├── android/                    # Capacitor-generated Android project (open in Android Studio)
-├── assets/
-│   ├── icon.png                # App icon
-│   ├── splash.png              # Splash screen image
-│   └── ging-banner.png         # README banner
-├── public/
-│   └── logo.png                # In-app logo
-├── src/
-│   ├── App.tsx                 # Root component, state management, alarm scheduler
-│   ├── main.tsx                # React entry point
-│   ├── index.css               # Global styles
-│   ├── types.ts                # TypeScript type definitions
-│   ├── components/
-│   │   ├── Splash.tsx          # Splash/onboarding screen
-│   │   ├── PermissionsSetup.tsx # Permission request flow
-│   │   ├── QRCodeManager.tsx   # QR code generation, download (PNG/PDF)
-│   │   ├── Dashboard.tsx       # Main alarm dashboard & management
-│   │   ├── AlarmRinger.tsx     # Alarm ringing screen with camera QR scanner
-│   │   └── GingLogo.tsx        # Logo component
-│   └── utils/
-│       └── audio.ts            # Audio engine (4 procedural alarm sounds + TTS)
-├── capacitor.config.ts         # Capacitor configuration
-├── vite.config.ts              # Vite build configuration
-├── tsconfig.json               # TypeScript configuration
-├── package.json                # Dependencies & scripts
-└── ANDROID_STUDIO_GUIDE.md     # Detailed Android Studio integration guide
-```
-
----
-
-## 📜 Available Scripts
+## Available Scripts
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start Vite dev server on port 3000 |
+| `npm run dev` | Start the Vite dev server on port 3000 (LAN-accessible) |
 | `npm run build` | Production build to `dist/` |
 | `npm run preview` | Preview the production build locally |
-| `npm run lint` | TypeScript type-check (no emit) |
-| `npx cap sync` | Sync web assets to the Android project |
+| `npm run lint` | TypeScript type-check with no emit (`tsc --noEmit`) |
+| `npm run clean` | Remove `dist/` and generated server files |
+| `npx cap sync android` | Sync web assets into the Android project |
 | `npx cap open android` | Open the Android project in Android Studio |
 
 ---
 
-## 🤝 Contributing
+## Project Structure
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+```
+ging/
+├── android/                         # Capacitor-generated native Android project
+├── assets/
+│   ├── icon.png                     # App icon
+│   └── splash.png                   # Source splash asset
+├── public/
+│   └── logo.png                     # In-app logo
+├── src/
+│   ├── App.tsx                      # Root component, state machine, alarm scheduler, persistence
+│   ├── main.tsx                     # React entry point
+│   ├── index.css                    # Design system: @theme tokens, glass primitives, animations
+│   ├── types.ts                     # TypeScript type definitions (Alarm, PermissionItem, AppState)
+│   ├── components/
+│   │   ├── Splash.tsx               # Welcome / launch screen
+│   │   ├── PermissionsSetup.tsx     # iOS Settings-style permission grant flow
+│   │   ├── QRCodeManager.tsx        # QR generation, PNG/PDF download, regenerate
+│   │   ├── Dashboard.tsx            # Alarm list, add/edit/delete, sound + repeat picker
+│   │   ├── AlarmRinger.tsx          # Ringing screen with live camera QR scanner
+│   │   ├── TimeWheelPicker.tsx      # iOS-style scroll-wheel time picker (12h + AM/PM)
+│   │   └── GingLogo.tsx             # Squircle logo component
+│   └── utils/
+│       └── audio.ts                 # Procedural alarm sound engine (Web Audio API)
+├── capacitor.config.ts              # Capacitor config (appId, webDir)
+├── vite.config.ts                   # Vite build config (React + Tailwind plugins)
+├── tsconfig.json                    # TypeScript config
+├── package.json                     # Dependencies and scripts
+├── android_studio_guide.md          # Detailed Android Studio integration guide
+└── index.html                       # HTML entry point
+```
 
 ---
 
-## 📄 License
+## State Persistence
 
-This project is licensed under the Apache 2.0 License — see individual source files for details.
+All app state is persisted in a single localStorage entry keyed **`GING_WAKEUPS_APPSTORE_STATE`**. It stores:
+
+- `hasCompletedOnboarding` — whether the user finished the setup flow
+- `alarms` — the full list of configured alarms
+- `permissions` — the six permission records and their granted state
+- `userQRSecret` — the generated wake-up code string
+- `lastWakeUpTime` — the date of the last successful scan
+
+This ensures the user's alarms and QR code survive app restarts and device reboots without any backend.
+
+---
+
+## License
+
+This project is licensed under the Apache 2.0 License. See individual source file headers for details.
 
 ---
 
 <p align="center">
-  <strong>Ging</strong> — <em>Gisising ka kahit ayaw mo pa</em> 🇵🇭
+  <strong>Ging</strong> — <em>Gising ka kahit ayaw mo pa.</em>
 </p>
