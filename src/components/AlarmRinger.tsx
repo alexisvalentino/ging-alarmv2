@@ -7,7 +7,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import jsQR from 'jsqr';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Camera, CheckCircle, RefreshCw, Ban
+  CheckCircle, RefreshCw, Ban
 } from 'lucide-react';
 import { Alarm } from '../types';
 import { gingAudio } from '../utils/audio';
@@ -49,9 +49,6 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
   const loopRef = useRef<number | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
 
-  // Keep a flash/color toggle state for the calm pulsing background
-  const [flashToggle, setFlashToggle] = useState(false);
-
   // Sound triggering and live clock
   useEffect(() => {
     // Start playing the brutal audio on load at absolute maximum volume!
@@ -78,14 +75,8 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
     updateClock();
     const interval = setInterval(updateClock, 1000);
 
-    // Calm pulsing toggle for the background (replaces the 180ms hard strobe)
-    const flashInterval = setInterval(() => {
-      setFlashToggle(prev => !prev);
-    }, 700);
-
     return () => {
       clearInterval(interval);
-      clearInterval(flashInterval);
       if (volumeGuardInterval) clearInterval(volumeGuardInterval);
       gingAudio.stop();
       stopCamera();
@@ -292,8 +283,8 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
         <span className="font-sans font-semibold text-[17px] text-white tracking-tight">
           {alarm.label || 'Alarm'}
         </span>
-        <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium border ${scanStatus === 'authenticated' ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' : 'bg-[#FF453A]/15 border-[#FF453A]/30 text-[#FF453A]'}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${scanStatus === 'authenticated' ? 'bg-emerald-400' : 'bg-[#FF453A]'} ${flashToggle ? 'opacity-100' : 'opacity-40'} transition-opacity`} />
+        <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium ${scanStatus === 'authenticated' ? 'glass-badge-green' : 'glass-badge-red'}`}>
+          <span className={`w-1.5 h-1.5 rounded-full soft-pulse ${scanStatus === 'authenticated' ? 'bg-emerald-400' : 'bg-ging-red'}`} />
           <span>{scanStatus === 'authenticated' ? 'Verified' : 'Ringing'}</span>
         </div>
       </div>
@@ -303,9 +294,6 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
 
         {/* Big clock */}
         <div className="text-center">
-          <span className="text-[13px] text-zinc-400 block mb-1">
-            {alarm.label || 'Alarm'}
-          </span>
           <h2 className="text-[56px] font-semibold tracking-tight text-white tabular-nums">
             {currentTimeStr || '--:--'}
           </h2>
@@ -345,110 +333,79 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
               muted
             />
 
-            {/* Scanner overlay during active scanning */}
+            {/* Scanner overlay — minimal: corners + scan line only */}
             {isCameraActive && scanStatus === 'scanning' && (
-              <div className="absolute inset-0 pointer-events-none">
-                {/* Dim mask with a clear scanning window */}
-                <div className="absolute inset-0 bg-black/40" style={{
-                  WebkitMaskImage: 'radial-gradient(circle at center, transparent 38%, #000 39%)',
-                  maskImage: 'radial-gradient(circle at center, transparent 38%, #000 39%)',
-                }} />
-
-                {/* Scanning window border + corners */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-56 h-56 relative">
-                    {/* Animated scan line */}
-                    <div className="absolute inset-x-2 h-0.5 bg-[#FF8A42] scan-line rounded-full shadow-[0_0_8px_rgba(255,138,66,0.8)]" />
-                    {/* L-shaped corner brackets */}
-                    <div className="absolute -top-px -left-px w-7 h-7 border-t-2 border-l-2 border-[#FF8A42] rounded-tl-xl" />
-                    <div className="absolute -top-px -right-px w-7 h-7 border-t-2 border-r-2 border-[#FF8A42] rounded-tr-xl" />
-                    <div className="absolute -bottom-px -left-px w-7 h-7 border-b-2 border-l-2 border-[#FF8A42] rounded-bl-xl" />
-                    <div className="absolute -bottom-px -right-px w-7 h-7 border-b-2 border-r-2 border-[#FF8A42] rounded-br-xl" />
-                  </div>
-                </div>
-
-                {/* Bottom hint */}
-                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent pt-10 pb-4 px-4 text-center">
-                  <div className="inline-flex items-center gap-1.5 text-[13px] font-medium text-white">
-                    <Camera className="w-4 h-4 text-[#FF8A42]" />
-                    <span>Point at your QR code</span>
-                  </div>
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                <div className="w-56 h-56 relative">
+                  {/* Animated scan line — theme token, no glow */}
+                  <div className="absolute inset-x-2 h-0.5 bg-ging-orange scan-line rounded-full" />
+                  {/* L-shaped corner brackets */}
+                  <div className="absolute -top-px -left-px w-7 h-7 border-t-2 border-l-2 border-ging-orange rounded-tl-xl" />
+                  <div className="absolute -top-px -right-px w-7 h-7 border-t-2 border-r-2 border-ging-orange rounded-tr-xl" />
+                  <div className="absolute -bottom-px -left-px w-7 h-7 border-b-2 border-l-2 border-ging-orange rounded-bl-xl" />
+                  <div className="absolute -bottom-px -right-px w-7 h-7 border-b-2 border-r-2 border-ging-orange rounded-br-xl" />
                 </div>
               </div>
             )}
 
-            {/* Status overlays */}
+            {/* Status overlays — direct glass cards, no outer backdrop */}
             <AnimatePresence mode="wait">
               {scanStatus === 'authenticated' && (
                 <motion.div
                   key="authenticated"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0 z-30 bg-black/70 backdrop-blur-md flex items-center justify-center"
+                  initial={{ opacity: 0, scale: 0.94 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.94 }}
+                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                  className="absolute inset-0 z-30 flex items-center justify-center bg-black/50"
                 >
-                  <motion.div
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.9, opacity: 0 }}
-                    className="glass-card border-emerald-500/30 p-7 text-center w-[85%] rounded-3xl"
-                  >
-                    <div className="w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mx-auto mb-4 text-emerald-300">
-                      <CheckCircle className="w-8 h-8" />
+                  <div className="glass-card border-emerald-500/25 p-6 text-center w-[80%] rounded-2xl">
+                    <div className="w-12 h-12 rounded-full bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center mx-auto mb-3 text-emerald-300">
+                      <CheckCircle className="w-7 h-7" />
                     </div>
-                    <h3 className="text-[19px] font-semibold text-white">Wake up verified</h3>
-                    <p className="text-[13px] text-zinc-300 mt-2 leading-relaxed">
+                    <h3 className="text-[17px] font-semibold text-white">Wake up verified</h3>
+                    <p className="text-[13px] text-zinc-400 mt-1.5">
                       Code matches. Great start to your morning.
                     </p>
-                  </motion.div>
+                  </div>
                 </motion.div>
               )}
               {scanStatus === 'wrong-code' && (
                 <motion.div
                   key="wrong-code"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0 z-30 bg-black/70 backdrop-blur-md flex items-center justify-center"
+                  initial={{ opacity: 0, scale: 0.94 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.94 }}
+                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                  className="absolute inset-0 z-30 flex items-center justify-center bg-black/50"
                 >
-                  <motion.div
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.9, opacity: 0 }}
-                    className="glass-card border-red-500/30 p-7 text-center w-[85%] rounded-3xl"
-                  >
-                    <div className="w-14 h-14 rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center mx-auto mb-4 text-red-300">
-                      <Ban className="w-8 h-8" />
+                  <div className="glass-card border-red-500/25 p-6 text-center w-[80%] rounded-2xl">
+                    <div className="w-12 h-12 rounded-full bg-red-500/15 border border-red-500/25 flex items-center justify-center mx-auto mb-3 text-red-300">
+                      <Ban className="w-7 h-7" />
                     </div>
                     <h3 className="text-[17px] font-semibold text-white">Wrong code</h3>
-                    <p className="text-[13px] text-zinc-300 mt-2 leading-relaxed">
-                      That isn't your wake-up code. Walk to it and scan the correct one.
+                    <p className="text-[13px] text-zinc-400 mt-1.5">
+                      That isn't your wake-up code. Find the right one.
                     </p>
-                    <p className="text-[11px] text-zinc-500 mt-3 font-medium">
-                      Resuming scan…
-                    </p>
-                  </motion.div>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
 
-          {/* Camera status strip */}
-          <div className="bg-black/40 backdrop-blur-md border-t border-white/[0.06] px-4 py-3 flex justify-between items-center text-[12px]">
-            <span className="truncate max-w-[200px] text-zinc-400">{cameraLabel}</span>
-            <span className={`font-medium ${scanStatus === 'wrong-code' ? 'text-red-400' : scanStatus === 'authenticated' ? 'text-emerald-400' : 'text-[#FF8A42]'}`}>
+          {/* Camera status strip — integrated into glass-card border */}
+          <div className="px-4 py-2.5 flex justify-between items-center text-[12px] border-t border-white/[0.06]">
+            <span className="truncate max-w-[200px] text-zinc-500">{cameraLabel}</span>
+            <span className={`font-medium tabular-nums ${scanStatus === 'wrong-code' ? 'text-red-400' : scanStatus === 'authenticated' ? 'text-emerald-400' : 'text-ging-orange'}`}>
               {scanStatus === 'wrong-code' ? 'Retrying' : scanStatus === 'authenticated' ? 'Verified' : 'Scanning'}
             </span>
           </div>
         </div>
 
-        {/* Help footer */}
-        <div className="glass-card p-4 rounded-2xl text-center">
-          <p className="text-[13px] font-semibold text-white">How do I turn this off?</p>
-          <p className="text-[12px] text-zinc-400 mt-1.5 leading-relaxed">
-            Walk to your printed QR code and point this camera at it. There's no other way.
-          </p>
-        </div>
+        {/* Help hint — single subtle line */}
+        <p className="text-center text-[13px] text-zinc-500 font-medium pb-2">
+          Scan your QR code to turn off the alarm
+        </p>
       </div>
     </div>
   );
