@@ -388,7 +388,7 @@ export default function QRCodeManager({ userQRSecret, hasAlarms, onRegenerateSec
       <AnimatePresence>
         {showRegenerateConfirm && (
           <motion.div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-[#24110c]/45 px-5 py-8 backdrop-blur-[4px]"
+            className="fixed inset-0 z-[100] flex items-center justify-center px-5 py-8 qr-confirm-backdrop"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -403,7 +403,7 @@ export default function QRCodeManager({ userQRSecret, hasAlarms, onRegenerateSec
               aria-modal="true"
               aria-labelledby="regenerate-code-title"
               aria-describedby="regenerate-code-description"
-              className="glass-card-light w-full max-w-sm rounded-[28px] p-6 shadow-2xl"
+              className="qr-confirm-card w-full max-w-sm rounded-[28px] p-6"
               initial={{ opacity: 0, y: 10, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 6, scale: 0.98 }}
@@ -433,7 +433,7 @@ export default function QRCodeManager({ userQRSecret, hasAlarms, onRegenerateSec
                     setShowRegenerateConfirm(false);
                     onRegenerateSecret();
                   }}
-                  className="min-h-12 rounded-full bg-ging-burnt px-5 text-[15px] font-semibold text-white transition-colors active:bg-ging-burnt/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ging-orange"
+                  className="glass-button-glow min-h-12 rounded-full px-5 text-[15px] font-semibold text-white active:scale-[0.985] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ging-orange"
                 >
                   Replace code
                 </button>

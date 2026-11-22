@@ -103,6 +103,11 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.96),
     inset 0 0 0 1px rgba(164, 62, 0, 0.11),
     0 14px 30px -18px rgba(96, 48, 29, 0.36);
+  --ging-modal-scrim: rgba(83, 47, 32, 0.32);
+  --ging-modal-surface: linear-gradient(145deg, rgba(255, 252, 249, 0.985), rgba(255, 241, 233, 0.975));
+  --ging-modal-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.98),
+    0 28px 72px -34px rgba(56, 29, 18, 0.58);
 }
 
 html,
@@ -195,6 +200,21 @@ body {
   -webkit-backdrop-filter: var(--ging-glass-filter);
   backdrop-filter: var(--ging-glass-filter);
   border-radius: 24px;
+}
+
+.qr-confirm-backdrop {
+  background: var(--ging-modal-scrim);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
+  backdrop-filter: blur(18px) saturate(125%);
+}
+
+.qr-confirm-card {
+  color: var(--ging-ink);
+  background: var(--ging-modal-surface);
+  border: 1px solid rgba(164, 62, 0, 0.12);
+  box-shadow: var(--ging-modal-shadow);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
+  backdrop-filter: blur(28px) saturate(140%);
 }
 
 .glass-button {
