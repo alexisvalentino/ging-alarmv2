@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Alarm } from '../types';
 import { gingAudio } from '../utils/audio';
+import { lightHaptic, successHaptic } from '../utils/haptics';
 import TimeWheelPicker from './TimeWheelPicker';
 
 const formatTo12Hour = (time24: string) => {
@@ -199,6 +200,7 @@ export default function Dashboard({
   }, []);
 
   const handleToggleDay = (dayIndex: number) => {
+    void lightHaptic();
     if (newDays.includes(dayIndex)) {
       setNewDays(newDays.filter(d => d !== dayIndex));
     } else {
@@ -217,7 +219,13 @@ export default function Dashboard({
       soundType: newSoundType,
       qrSecret: userQRSecret,
     });
+    void successHaptic();
     closeSheet();
+  };
+
+  const selectSound = (soundType: Alarm['soundType']) => {
+    if (soundType !== newSoundType) void lightHaptic();
+    setNewSoundType(soundType);
   };
 
   const daysLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -452,7 +460,7 @@ export default function Dashboard({
                           >
                             <button
                               type="button"
-                              onClick={() => setNewSoundType(snd.key as Alarm['soundType'])}
+                              onClick={() => selectSound(snd.key as Alarm['soundType'])}
                               aria-pressed={isSelected}
                               className="sound-option-select"
                             >
@@ -464,7 +472,7 @@ export default function Dashboard({
                             <button
                               type="button"
                               onClick={() => {
-                                setNewSoundType(snd.key as Alarm['soundType']);
+                                selectSound(snd.key as Alarm['soundType']);
                                 handlePreviewSound(snd.key);
                               }}
                               aria-label={`${isPreviewing ? 'Stop' : 'Preview'} ${snd.label}`}

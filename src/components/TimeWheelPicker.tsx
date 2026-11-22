@@ -8,7 +8,8 @@
  * alarm data model and scheduler without any changes downstream.
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { changeSelectionHaptic, endSelectionHaptic, selectionTickHaptic, startSelectionHaptic } from '../utils/haptics';
 
 const ITEM_HEIGHT = 40;       // px per wheel row
 const VISIBLE_RADIUS = 2;     // rows above/below center visible in the fade band
@@ -61,6 +62,11 @@ function Wheel({
   const programmaticRef = useRef(false);
   const scrollTimer = useRef<number | null>(null);
   const programmaticTimer = useRef<number | null>(null);
+  const lastTickIndexRef = useRef(index);
+  const lastTickTimeRef = useRef(0);
+  const selectionStartedRef = useRef(false);
+  const didScrollRef = useRef(false);
+  const [visualIndex, setVisualIndex] = useState(index);
 
   const allowUserScrollAfter = (delay: number) => {
     if (programmaticTimer.current) window.clearTimeout(programmaticTimer.current);
@@ -74,6 +80,8 @@ function Wheel({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    setVisualIndex(index);
+    lastTickIndexRef.current = index;
     programmaticRef.current = true;
     el.scrollTop = index * ITEM_HEIGHT;
     // Allow user scroll after the initial layout settles.
@@ -81,17 +89,52 @@ function Wheel({
     return () => {
       if (programmaticTimer.current) window.clearTimeout(programmaticTimer.current);
       if (scrollTimer.current) window.clearTimeout(scrollTimer.current);
+      if (selectionStartedRef.current) {
+        selectionStartedRef.current = false;
+        void endSelectionHaptic();
+      }
     };
   }, [index]);
+
+  const beginTouchSelection = () => {
+    didScrollRef.current = false;
+    if (!selectionStartedRef.current) {
+      selectionStartedRef.current = true;
+      void startSelectionHaptic();
+    }
+  };
+
+  const endTouchSelection = () => {
+    if (!selectionStartedRef.current) return;
+    selectionStartedRef.current = false;
+    void endSelectionHaptic();
+  };
 
   const handleScroll = () => {
     const el = ref.current;
     if (!el || programmaticRef.current) return;
+    didScrollRef.current = true;
+    const liveIndex = Math.max(0, Math.min(items.length - 1, Math.round(el.scrollTop / ITEM_HEIGHT)));
+    setVisualIndex(current => current === liveIndex ? current : liveIndex);
+    if (liveIndex !== lastTickIndexRef.current) {
+      lastTickIndexRef.current = liveIndex;
+      const now = window.performance.now();
+      if (now - lastTickTimeRef.current >= 40) {
+        lastTickTimeRef.current = now;
+        if (!selectionStartedRef.current) {
+          selectionStartedRef.current = true;
+          void startSelectionHaptic();
+        }
+        void changeSelectionHaptic();
+      }
+    }
+
     // Debounce so we only commit when scrolling settles.
     if (scrollTimer.current) window.clearTimeout(scrollTimer.current);
     scrollTimer.current = window.setTimeout(() => {
       const i = Math.round(el.scrollTop / ITEM_HEIGHT);
       const clamped = Math.max(0, Math.min(items.length - 1, i));
+      setVisualIndex(clamped);
       if (clamped !== index) {
         onIndexChange(clamped);
       } else {
@@ -103,7 +146,12 @@ function Wheel({
           allowUserScrollAfter(80);
         }
       }
+      endTouchSelection();
     }, 90);
+  };
+
+  const handlePointerUp = () => {
+    if (!didScrollRef.current) endTouchSelection();
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -115,7 +163,10 @@ function Wheel({
     else return;
 
     event.preventDefault();
-    if (nextIndex !== index) onIndexChange(nextIndex);
+    if (nextIndex !== index) {
+      void selectionTickHaptic();
+      onIndexChange(nextIndex);
+    }
   };
 
   const selectedValue = Number(items[index]);
@@ -137,26 +188,29 @@ function Wheel({
         WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, #000 32%, #000 68%, transparent 100%)',
       }}
       onScroll={handleScroll}
+      onPointerDown={beginTouchSelection}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
       onKeyDown={handleKeyDown}
       ref={ref}
       role="spinbutton"
       aria-label={label}
       aria-valuemin={isNumericWheel ? firstValue : 1}
       aria-valuemax={isNumericWheel ? lastValue : items.length}
-      aria-valuenow={isNumericWheel ? selectedValue : index + 1}
-      aria-valuetext={`${label} ${format(items[index])}`}
+      aria-valuenow={isNumericWheel ? Number(items[visualIndex]) : visualIndex + 1}
+      aria-valuetext={`${label} ${format(items[visualIndex])}`}
       tabIndex={0}
     >
       {items.map((item, i) => (
         <div
           key={item}
           aria-hidden="true"
-          className={`snap-center flex items-center justify-center tabular-nums select-none time-wheel-value ${i === index ? 'is-selected' : ''}`}
+          className={`snap-center flex items-center justify-center tabular-nums select-none time-wheel-value ${i === visualIndex ? 'is-selected' : ''}`}
           style={{
             height: ITEM_HEIGHT,
             fontSize: 24,
-            fontWeight: i === index ? 650 : 500,
-            color: i === index ? 'var(--ging-ink)' : 'rgba(90, 65, 55, 0.44)',
+            fontWeight: i === visualIndex ? 650 : 500,
+            color: i === visualIndex ? 'var(--ging-ink)' : 'rgba(90, 65, 55, 0.44)',
           }}
         >
           {format(item)}
