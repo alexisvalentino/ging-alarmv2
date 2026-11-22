@@ -20,6 +20,17 @@ interface AlarmRingerProps {
   onDismiss: () => void;
 }
 
+const ALARM_OFF_SPARKS = [
+  { x: 0, y: -62, rotate: 0, color: '#FF6B1A' },
+  { x: 44, y: -44, rotate: 45, color: '#A43E00' },
+  { x: 62, y: 0, rotate: 90, color: '#6E9F76' },
+  { x: 44, y: 44, rotate: 135, color: '#FF944D' },
+  { x: 0, y: 62, rotate: 180, color: '#A43E00' },
+  { x: -44, y: 44, rotate: 225, color: '#6E9F76' },
+  { x: -62, y: 0, rotate: 270, color: '#FF6B1A' },
+  { x: -44, y: -44, rotate: 315, color: '#FF944D' },
+];
+
 export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
   const [scanStatus, setScanStatus] = useState<'scanning' | 'wrong-code' | 'authenticated'>('scanning');
   const scanStatusRef = useRef<'scanning' | 'wrong-code' | 'authenticated'>('scanning');
@@ -288,15 +299,36 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
             aria-hidden="true"
             className="alarm-off-mascot"
           />
-          <motion.div
-            className="alarm-off-check"
-            initial={{ opacity: 0, scale: 0.72 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.35, type: 'spring', stiffness: 300, damping: 18 }}
-            aria-hidden="true"
-          >
-            <CheckCircle className="w-9 h-9" strokeWidth={1.8} />
-          </motion.div>
+          <div className="alarm-off-mark">
+            <div className="alarm-off-burst" aria-hidden="true">
+              {ALARM_OFF_SPARKS.map((spark, index) => (
+                <motion.span
+                  key={index}
+                  className="alarm-off-spark"
+                  style={{ backgroundColor: spark.color }}
+                  initial={{ opacity: 0, scale: 0.25, x: 0, y: 0, rotate: 0 }}
+                  animate={{
+                    opacity: [0, 1, 0],
+                    scale: [0.25, 1, 0.75],
+                    x: spark.x,
+                    y: spark.y,
+                    rotate: spark.rotate,
+                  }}
+                  transition={{ delay: 0.22, duration: 0.68, ease: [0.16, 1, 0.3, 1] }}
+                  aria-hidden="true"
+                />
+              ))}
+            </div>
+            <motion.div
+              className="alarm-off-check"
+              initial={{ opacity: 0, scale: 0.72 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.35, type: 'spring', stiffness: 300, damping: 18 }}
+              aria-hidden="true"
+            >
+              <CheckCircle className="w-9 h-9" strokeWidth={1.8} />
+            </motion.div>
+          </div>
           <motion.h1
             className="alarm-off-title"
             initial={{ opacity: 0, y: 8 }}
