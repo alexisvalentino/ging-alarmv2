@@ -267,6 +267,49 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
     scheduleScanFrame();
   };
 
+  if (scanStatus === 'authenticated') {
+    return (
+      <motion.main
+        className="relative min-h-dvh flex flex-col items-center justify-center overflow-hidden ambient-glow-bg ging-screen ging-screen--alarm-off font-sans"
+        role="status"
+        aria-live="assertive"
+        aria-label="Alarm off"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+      >
+        <div className="glow-sphere-orange top-[-10%] left-[-15%]" />
+        <div className="glow-sphere-red bottom-[-15%] right-[-10%]" />
+
+        <div className="alarm-off-content z-10">
+          <img
+            src="/gingy-mascot-cutout.webp"
+            alt=""
+            aria-hidden="true"
+            className="alarm-off-mascot"
+          />
+          <motion.div
+            className="alarm-off-check"
+            initial={{ opacity: 0, scale: 0.72 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.35, type: 'spring', stiffness: 300, damping: 18 }}
+            aria-hidden="true"
+          >
+            <CheckCircle className="w-9 h-9" strokeWidth={1.8} />
+          </motion.div>
+          <motion.h1
+            className="alarm-off-title"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.42, duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+          >
+            Alarm off
+          </motion.h1>
+        </div>
+      </motion.main>
+    );
+  }
+
   return (
     <div className="relative min-h-dvh text-[#261813] select-none flex flex-col overflow-x-hidden font-sans ambient-glow-bg ging-screen ging-screen--ringing">
       {/* Hidden processing canvas used for frame analysis */}
@@ -343,31 +386,8 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
               </div>
             )}
 
-            {/* Status overlays — direct glass cards, no outer backdrop */}
+            {/* Keep a short wrong-code response over the live camera. */}
             <AnimatePresence mode="wait">
-              {scanStatus === 'authenticated' && (
-                <motion.div
-                  key="authenticated"
-                  initial={{ opacity: 0, scale: 0.94 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.94 }}
-                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                  className="absolute inset-0 z-30 flex items-center justify-center bg-black/50"
-                >
-                  <div className="glass-card border-emerald-500/25 p-6 text-center w-[80%] rounded-2xl">
-                    <img
-                      src="/gingy-mascot-cutout.webp"
-                      alt=""
-                      aria-hidden="true"
-                      className="ringing-success-mascot"
-                    />
-                    <div className="w-12 h-12 rounded-full bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center mx-auto mb-3 text-emerald-300">
-                      <CheckCircle className="w-7 h-7" />
-                    </div>
-                    <h3 className="text-[17px] font-semibold text-white">Alarm off</h3>
-                  </div>
-                </motion.div>
-              )}
               {scanStatus === 'wrong-code' && (
                 <motion.div
                   key="wrong-code"
