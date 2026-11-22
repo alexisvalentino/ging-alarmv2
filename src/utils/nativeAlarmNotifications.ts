@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Alarm } from '../types';
-import { buildAlarmNotifications, NOTIFICATION_SOURCE } from './alarmNotificationSchedule';
+import { buildAlarmNotifications, getAlarmNotificationMetadata, NOTIFICATION_SOURCE } from './alarmNotificationSchedule';
 
 export interface AlarmNotificationReadiness {
   available: boolean;
@@ -94,9 +94,9 @@ export function syncAlarmNotifications(alarms: Alarm[]) {
 export async function clearDeliveredAlarmNotifications() {
   if (!Capacitor.isNativePlatform()) return;
 
-  const { notifications } = await LocalNotifications.getDeliveredNotifications();
+  const { notifications } = await LocalNotifications.getAll({ state: 'TRIGGERED' });
   const ownedNotificationIds = notifications
-    .filter(notification => notification.extra?.source === NOTIFICATION_SOURCE)
+    .filter(notification => getAlarmNotificationMetadata(notification))
     .map(({ id }) => id);
 
   if (ownedNotificationIds.length > 0) {

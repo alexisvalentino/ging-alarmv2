@@ -3,6 +3,41 @@ import type { Alarm } from '../types';
 
 const NOTIFICATION_SOURCE = 'ging-alarm';
 
+export function getAlarmNotificationMetadata(notification: { extra?: unknown; data?: unknown }) {
+  const candidates = [notification.extra, notification.data];
+
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== 'object') continue;
+    const record = candidate as Record<string, unknown>;
+    const nested = record.extra;
+    const possibleMetadata = nested && typeof nested === 'object'
+      ? nested as Record<string, unknown>
+      : record;
+
+    if (possibleMetadata.source === NOTIFICATION_SOURCE && typeof possibleMetadata.alarmId === 'string') {
+      return { alarmId: possibleMetadata.alarmId };
+    }
+  }
+
+  return null;
+}
+
+export async function handleAlarmNotification(
+  notification: { id: number; extra?: unknown; data?: unknown },
+  alarms: Alarm[],
+  activate: (alarm: Alarm) => void,
+  removeDelivered: (id: number) => Promise<void>
+) {
+  const metadata = getAlarmNotificationMetadata(notification);
+  if (!metadata) return;
+
+  const alarm = alarms.find(candidate => candidate.id === metadata.alarmId && candidate.active);
+  if (alarm) activate(alarm);
+
+  // Clear owned alerts even when their alarm was disabled or deleted after delivery.
+  await removeDelivered(notification.id);
+}
+
 function notificationId(alarmId: string, day: number) {
   let hash = 0x811c9dc5;
   const value = `${alarmId}:${day}`;

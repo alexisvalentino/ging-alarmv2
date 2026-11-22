@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildAlarmNotifications } from '../src/utils/alarmNotificationSchedule';
+import { buildAlarmNotifications, handleAlarmNotification, NOTIFICATION_SOURCE } from '../src/utils/alarmNotificationSchedule';
 import type { Alarm } from '../src/types';
 
 const activeAlarm: Alarm = {
@@ -31,4 +31,64 @@ test('builds precise native notifications only for active alarm days', () => {
   assert.ok(notifications.every(notification => notification.autoCancel === false));
   assert.ok(notifications.every(notification => notification.extra?.alarmId === activeAlarm.id));
   assert.equal(new Set(notifications.map(notification => notification.id)).size, notifications.length);
+});
+
+test('removes an old delivered notification even after its alarm is disabled', async () => {
+  const removedIds: number[] = [];
+  const activatedAlarms: Alarm[] = [];
+
+  await handleAlarmNotification(
+    { id: 77, extra: { source: NOTIFICATION_SOURCE, alarmId: activeAlarm.id } },
+    [{ ...activeAlarm, active: false }],
+    alarm => activatedAlarms.push(alarm),
+    async id => { removedIds.push(id); }
+  );
+
+  assert.deepEqual(removedIds, [77]);
+  assert.deepEqual(activatedAlarms, []);
+});
+
+test('opens a ringing flow for an active alarm and removes its alert', async () => {
+  const removedIds: number[] = [];
+  const activatedAlarms: Alarm[] = [];
+
+  await handleAlarmNotification(
+    { id: 78, extra: { source: NOTIFICATION_SOURCE, alarmId: activeAlarm.id } },
+    [activeAlarm],
+    alarm => activatedAlarms.push(alarm),
+    async id => { removedIds.push(id); }
+  );
+
+  assert.deepEqual(removedIds, [78]);
+  assert.deepEqual(activatedAlarms, [activeAlarm]);
+});
+
+test('reads Android delivered-notification metadata from data', async () => {
+  const removedIds: number[] = [];
+  const activatedAlarms: Alarm[] = [];
+
+  await handleAlarmNotification(
+    { id: 80, data: { source: NOTIFICATION_SOURCE, alarmId: activeAlarm.id } },
+    [activeAlarm],
+    alarm => activatedAlarms.push(alarm),
+    async id => { removedIds.push(id); }
+  );
+
+  assert.deepEqual(removedIds, [80]);
+  assert.deepEqual(activatedAlarms, [activeAlarm]);
+});
+
+test('leaves notifications owned by other features untouched', async () => {
+  const removedIds: number[] = [];
+  const activatedAlarms: Alarm[] = [];
+
+  await handleAlarmNotification(
+    { id: 79, extra: { source: 'other-feature', alarmId: activeAlarm.id } },
+    [activeAlarm],
+    alarm => activatedAlarms.push(alarm),
+    async id => { removedIds.push(id); }
+  );
+
+  assert.deepEqual(removedIds, []);
+  assert.deepEqual(activatedAlarms, []);
 });

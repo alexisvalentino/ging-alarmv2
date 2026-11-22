@@ -11,12 +11,13 @@ import { Alarm, PermissionItem, AppState } from './types';
 import Splash from './components/Splash';
 import StartupScreen from './components/StartupScreen';
 import { generateWakeUpSecret } from './utils/qrSecret';
+import { mergePermissionsWithDefaults } from './utils/permissionState';
 import {
   checkAlarmNotificationReadiness,
   clearDeliveredAlarmNotifications,
   syncAlarmNotifications
 } from './utils/nativeAlarmNotifications';
-import { NOTIFICATION_SOURCE } from './utils/alarmNotificationSchedule';
+import { getAlarmNotificationMetadata, handleAlarmNotification } from './utils/alarmNotificationSchedule';
 
 const PermissionsSetup = lazy(() => import('./components/PermissionsSetup'));
 const QRCodeManager = lazy(() => import('./components/QRCodeManager'));
@@ -98,7 +99,9 @@ export default function App() {
         const parsed = JSON.parse(cached);
         // Ensure properties exist
         const hasOnboarded = parsed.hasCompletedOnboarding || false;
-        const rawPermissions = applyPlatformPermissionDefaults(parsed.permissions || initialPermissions);
+        const rawPermissions = applyPlatformPermissionDefaults(
+          mergePermissionsWithDefaults(initialPermissions, parsed.permissions)
+        );
         const pendingAlarm: Alarm | null = hasOnboarded ? parsed.activeRingingAlarm || null : null;
 
         // Force reset to false if onboarding is not completed to ensure they are prompted
@@ -257,15 +260,13 @@ export default function App() {
     let disposed = false;
     const handles: Array<{ remove: () => Promise<void> }> = [];
     const openAlarmFromNotification = async (notification: { extra?: unknown; id: number }) => {
-      const extra = notification.extra as { source?: string; alarmId?: string } | undefined;
-      if (extra?.source !== NOTIFICATION_SOURCE || !extra.alarmId) return;
-
-      const alarm = stateRef.current.alarms.find(candidate => candidate.id === extra.alarmId && candidate.active);
-      if (!alarm) return;
-
-      activateAlarm(alarm);
       try {
-        await LocalNotifications.removeDeliveredNotificationsById({ ids: [notification.id] });
+        await handleAlarmNotification(
+          notification,
+          stateRef.current.alarms,
+          activateAlarm,
+          id => LocalNotifications.removeDeliveredNotificationsById({ ids: [id] })
+        );
       } catch (error) {
         console.warn('Could not clear the opened wake-up alert:', error);
       }
@@ -283,11 +284,10 @@ export default function App() {
         handles.push(received, opened);
       }
 
-      const delivered = await LocalNotifications.getDeliveredNotifications();
+      const delivered = await LocalNotifications.getAll({ state: 'TRIGGERED' });
       for (const notification of delivered.notifications) {
-        if (notification.extra?.source === NOTIFICATION_SOURCE) {
+        if (getAlarmNotificationMetadata(notification)) {
           await openAlarmFromNotification(notification);
-          break;
         }
       }
     };
