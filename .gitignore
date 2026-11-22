@@ -8,6 +8,26 @@ coverage/
 
 # Environment
 .env*
+!.env.example
+!.env.*.example
+.secret
+.secrets
+*.secret
+*.secrets
+*.keystore
+*.jks
+*.pem
+*.p12
+*.pfx
+key.properties
+
+# Local agent state and design references
+.impeccable/
+stitch_ging_qr_alarm_app/
+
+# Local scratch and generated intermediates
+tmp/
+output/
 
 # OS files
 .DS_Store
