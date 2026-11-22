@@ -34,6 +34,20 @@ public class MainActivity extends BridgeActivity {
             // Disable native hardware back button completely during alarm ringing
             return;
         }
+
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            // Let the active web screen close its sheet or handle setup navigation first.
+            getBridge().getWebView().evaluateJavascript(
+                "(function(){var event=new CustomEvent('ging:back',{cancelable:true});window.dispatchEvent(event);return event.defaultPrevented;})()",
+                handled -> {
+                    if (!"true".equals(handled)) {
+                        MainActivity.super.onBackPressed();
+                    }
+                }
+            );
+            return;
+        }
+
         super.onBackPressed();
     }
 

@@ -6,7 +6,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Plus, BellOff, Play, Square, QrCode, X, Minus
+  Plus, Play, Square, QrCode, X, Minus, Tag, Volume2
 } from 'lucide-react';
 import { Alarm } from '../types';
 import { gingAudio } from '../utils/audio';
@@ -75,12 +75,14 @@ export default function Dashboard({
   const [showAddForm, setShowAddForm] = useState(false);
   const [editing, setEditing] = useState(false);
   const [newTime, setNewTime] = useState('06:00');
-  const [newLabel, setNewLabel] = useState('Mornings in the Shower');
+  const [newLabel, setNewLabel] = useState('');
   const [newDays, setNewDays] = useState<number[]>([1, 2, 3, 4, 5]); // weekdays by default
   const [newSoundType, setNewSoundType] = useState<Alarm['soundType']>('industrial');
-  const [newVolume, setNewVolume] = useState(0.8);
   const [previewPlaying, setPreviewPlaying] = useState<string | null>(null);
   const previewTimerRef = useRef<number | null>(null);
+  const addAlarmButtonRef = useRef<HTMLButtonElement>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   // Sound preview handler — plays 1.5s sample then auto-stops
   const handlePreviewSound = useCallback((soundKey: string) => {
@@ -104,13 +106,66 @@ export default function Dashboard({
     }, 1500);
   }, [previewPlaying]);
 
-  const closeSheet = () => {
+  const closeSheet = useCallback(() => {
     // Stop any preview sound before closing the add sheet
     gingAudio.stop();
     if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+    previewTimerRef.current = null;
     setPreviewPlaying(null);
     setShowAddForm(false);
-  };
+    setNewTime('06:00');
+    setNewLabel('');
+    setNewDays([1, 2, 3, 4, 5]);
+    setNewSoundType('industrial');
+  }, []);
+
+  React.useEffect(() => {
+    if (!showAddForm) return;
+
+    cancelButtonRef.current?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeSheet();
+        return;
+      }
+
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+      const controls = Array.from(dialogRef.current.querySelectorAll(
+        'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      ) as NodeListOf<HTMLElement>).filter(control => control.getAttribute('aria-hidden') !== 'true');
+      if (controls.length === 0) return;
+
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    const handleNativeBack = (event: Event) => {
+      event.preventDefault();
+      closeSheet();
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('ging:back', handleNativeBack);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('ging:back', handleNativeBack);
+      addAlarmButtonRef.current?.focus();
+    };
+  }, [showAddForm, closeSheet]);
+
+  React.useEffect(() => () => {
+    if (previewTimerRef.current) window.clearTimeout(previewTimerRef.current);
+    gingAudio.stop();
+  }, []);
 
   const handleToggleDay = (dayIndex: number) => {
     if (newDays.includes(dayIndex)) {
@@ -124,72 +179,107 @@ export default function Dashboard({
     e.preventDefault();
     onAddAlarm({
       time: newTime,
-      label: newLabel || 'Wake Up Challenge',
+      label: newLabel.trim() || 'Alarm',
       active: true,
       days: newDays,
-      volume: newVolume,
+      volume: 1.0,
       soundType: newSoundType,
       qrSecret: userQRSecret,
     });
     closeSheet();
-    // Reset fields to helpful standards
-    setNewTime('06:00');
-    setNewLabel('Mornings in the Shower');
   };
 
   const daysLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
   return (
-    <div className="relative min-h-screen ambient-glow-bg text-white flex flex-col overflow-x-hidden font-sans">
+    <div className="relative min-h-dvh ambient-glow-bg ging-screen ging-screen--dashboard text-white flex flex-col overflow-x-hidden font-sans">
       {/* Faint ambient haze */}
       <div className="glow-sphere-orange top-[-10%] left-[-15%]" />
       <div className="glow-sphere-red bottom-[-15%] right-[-10%]" />
 
-      {/* Header — iOS Alarm tab layout */}
-      <div className="sticky top-0 z-20 max-w-md w-full mx-auto flex items-center justify-between px-6 pt-5 pb-3 bg-gradient-to-b from-black via-black/80 to-transparent">
-        <button
-          onClick={() => setEditing(e => !e)}
-          className="text-[15px] font-medium text-[#FF8A42] min-w-[44px] text-left"
-        >
-          {editing ? 'Done' : 'Edit'}
-        </button>
-        <h1 className="text-[28px] font-bold text-white tracking-tight">Alarms</h1>
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="min-w-[44px] flex justify-end"
-          aria-label="Add alarm"
-        >
-          <Plus className="w-7 h-7 text-[#FF8A42]" />
-        </button>
+      {/* Reserve a stable header slot for the mascot so the alarm list can grow below it. */}
+      <div className="relative z-20 max-w-md w-full mx-auto px-6 dashboard-header">
+        <div className="dashboard-toolbar">
+          <button
+            onClick={() => setEditing(e => !e)}
+            className="w-16 min-h-[44px] text-left text-[15px] font-medium text-ging-burnt"
+            aria-pressed={editing}
+          >
+            {editing ? 'Done' : 'Manage'}
+          </button>
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="w-16 h-11 flex items-center justify-end"
+            aria-label="Add alarm"
+            ref={addAlarmButtonRef}
+          >
+            <Plus className="w-7 h-7 text-ging-orange" />
+          </button>
+        </div>
+        <div className={`dashboard-heading ${alarms.length === 0 ? 'dashboard-heading--empty' : ''}`}>
+          <h1 className="dashboard-title text-[28px] font-bold text-white tracking-tight">Wake schedule</h1>
+          {alarms.length > 0 && (
+            <img
+              src="/gingy-mascot-cutout.webp"
+              alt=""
+              aria-hidden="true"
+              className="dashboard-mascot"
+            />
+          )}
+        </div>
       </div>
 
       {/* Alarm list */}
-      <div className="flex-1 max-w-md w-full mx-auto px-6 pb-28 space-y-px z-10">
+      <div className="flex-1 max-w-md w-full mx-auto px-6 pb-28 space-y-px z-10 dashboard-list">
         {alarms.length === 0 ? (
-          <div className="pt-24 text-center">
-            <BellOff className="w-8 h-8 mx-auto text-zinc-600 mb-3" />
+          <div className="dashboard-empty pt-14 text-center">
+            <img src="/gingy-mascot-cutout.webp" alt="" aria-hidden="true" className="dashboard-empty-mascot" />
             <p className="text-[15px] font-medium text-zinc-400">No alarms</p>
             <p className="text-[13px] text-zinc-600 mt-1">Tap + to add one.</p>
           </div>
         ) : (
-          <div className="glass-card divide-y divide-white/[0.06] overflow-hidden">
-            {alarms.map((alarm) => {
-              const { time, suffix } = splitTime(alarm.time);
-              return (
-                <div
-                  key={alarm.id}
-                  className={`flex items-center gap-3 px-4 py-4 ${alarm.active ? '' : 'opacity-40'}`}
-                >
-                  {/* Edit-mode delete handle */}
-                  {editing && (
-                    <button
-                      onClick={() => onDeleteAlarm(alarm.id)}
-                      className="shrink-0 w-6 h-6 rounded-full border border-[#FF453A]/60 flex items-center justify-center text-[#FF453A]"
-                      aria-label={`Delete ${alarm.label}`}
+          <div className={`glass-card divide-y divide-white/[0.06] overflow-hidden dashboard-alarms ${alarms.length === 1 ? 'dashboard-alarms--single' : ''}`}>
+            <AnimatePresence initial={false}>
+              {alarms.map((alarm) => {
+                const { time, suffix } = splitTime(alarm.time);
+                const alarmLabel = alarm.id === 'default-morning' && alarm.label === 'Bathroom Mirror Session'
+                  ? 'Morning alarm'
+                  : alarm.label;
+                return (
+                  <motion.div
+                    key={alarm.id}
+                    layout="position"
+                    initial={{ opacity: 0, y: 7 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.985, transition: { duration: 0.12 } }}
+                    transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                    className={`flex items-center gap-3 px-4 py-4 dashboard-alarm-row ${alarm.active ? '' : 'opacity-55'}`}
+                  >
+                    {/* Collapse the delete slot after its control exits so the row reclaims the space. */}
+                    <motion.div
+                      initial={false}
+                      animate={{ width: editing ? 48 : 0, opacity: editing ? 1 : 0, marginRight: editing ? 0 : -12 }}
+                      transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
+                      className="shrink-0 h-12 flex items-center justify-center overflow-hidden"
+                      aria-hidden={!editing}
                     >
-                      <Minus className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                      <AnimatePresence initial={false}>
+                        {editing && (
+                          <motion.button
+                            key="delete"
+                            initial={{ opacity: 0, scale: 0.82 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.82 }}
+                            transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
+                            onClick={() => onDeleteAlarm(alarm.id)}
+                            className="shrink-0 w-12 h-12 rounded-full border border-ging-red/60 flex items-center justify-center text-ging-red"
+                            aria-label={`Delete ${alarmLabel}`}
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </motion.button>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
 
                   {/* Time + details */}
                   <div className="flex-1 min-w-0">
@@ -199,8 +289,8 @@ export default function Dashboard({
                       </span>
                       <span className="text-[15px] font-medium text-zinc-400">{suffix}</span>
                     </div>
-                    <p className="text-[13px] text-zinc-400 truncate mt-0.5">
-                      {alarm.label} · {repeatSummary(alarm.days)}
+                    <p className="text-[13px] text-zinc-400 mt-0.5 leading-snug break-words">
+                      {alarmLabel} · {repeatSummary(alarm.days)}
                     </p>
                   </div>
 
@@ -209,13 +299,14 @@ export default function Dashboard({
                     onClick={() => onToggleAlarm(alarm.id)}
                     className={`ios-toggle ${alarm.active ? 'is-on' : 'is-off'} shrink-0`}
                     aria-pressed={alarm.active}
-                    aria-label={`Toggle ${alarm.label}`}
+                    aria-label={`Toggle ${alarmLabel}`}
                   >
                     <span className="ios-toggle__knob" />
                   </button>
-                </div>
-              );
-            })}
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
           </div>
         )}
 
@@ -223,9 +314,9 @@ export default function Dashboard({
         <div className="mt-8 flex items-center justify-between px-1">
           <button
             onClick={onNavigateToQR}
-            className="flex items-center gap-2 text-[13px] text-zinc-400 font-medium hover:text-white transition-colors"
+            className="flex items-center gap-2 text-[13px] text-zinc-400 font-medium transition-colors dashboard-qr-link"
           >
-            <QrCode className="w-4 h-4 text-[#FF8A42]" />
+            <QrCode className="w-4 h-4 text-ging-orange" />
             <span>Wake-up code</span>
           </button>
         </div>
@@ -241,6 +332,7 @@ export default function Dashboard({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={closeSheet}
+              aria-hidden="true"
               className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
             />
             {/* Sheet */}
@@ -248,82 +340,89 @@ export default function Dashboard({
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 32, stiffness: 320 }}
-              className="fixed bottom-0 inset-x-0 z-50 max-h-[88vh] overflow-y-auto glass-card-light rounded-t-3xl border-b-0 mx-auto max-w-md"
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              className="fixed bottom-0 inset-x-0 z-50 max-h-[94dvh] overflow-y-auto overscroll-y-contain scrollbar-hide glass-card-light rounded-t-3xl border-b-0 mx-auto max-w-md alarm-sheet"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="new-alarm-title"
+              ref={dialogRef}
             >
               {/* Drag handle */}
               <div className="sticky top-0 z-10 pt-3 pb-2 bg-transparent flex flex-col items-center">
-                <div className="w-10 h-1 rounded-full bg-white/20" />
+                <div className="w-10 h-1 rounded-full bg-ging-orange/25" />
               </div>
 
-              <div className="px-5 pb-8">
+              <div className="px-5 pb-4">
                 {/* Sheet header */}
                 <div className="flex items-center justify-between mb-5">
                   <button
+                    type="button"
                     onClick={closeSheet}
-                    className="flex items-center gap-1 text-[15px] font-medium text-zinc-400 hover:text-white transition-colors"
+                    className="flex items-center gap-1 text-[15px] font-medium text-zinc-400 transition-colors"
+                    ref={cancelButtonRef}
                   >
                     <X className="w-4 h-4" />
                     <span>Cancel</span>
                   </button>
-                  <h2 className="text-[17px] font-semibold text-white">New Alarm</h2>
+                  <h2 id="new-alarm-title" className="text-[17px] font-semibold text-white">New Alarm</h2>
                   <span className="w-[72px]" />
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-5">
+                <form onSubmit={handleSubmit} className="space-y-4 alarm-form">
                   {/* Time picker — iOS scroll wheel */}
-                  <div className="glass-card py-5 flex justify-center">
+                  <div className="glass-card py-5 flex justify-center time-wheel-card">
                     <TimeWheelPicker value={newTime} onChange={setNewTime} />
                   </div>
 
                   {/* Label */}
-                  <div>
-                    <label className="block text-[12px] font-medium text-zinc-400 mb-1.5">Label</label>
-                    <input
-                      type="text"
-                      value={newLabel}
-                      onChange={(e) => setNewLabel(e.target.value)}
-                      placeholder="e.g. Bathroom"
-                      className="w-full glass-input rounded-xl px-3 py-2.5 text-white font-medium text-[14px]"
-                    />
+                  <div className="alarm-label-field">
+                    <label htmlFor="alarm-label" className="alarm-field-label block text-[12px] font-medium text-zinc-400 mb-2">Label</label>
+                    <div className="alarm-label-control">
+                      <Tag className="w-[17px] h-[17px] text-ging-burnt shrink-0" aria-hidden="true" />
+                      <input
+                        id="alarm-label"
+                        type="text"
+                      maxLength={50}
+                      autoComplete="off"
+                        value={newLabel}
+                        onChange={(e) => setNewLabel(e.target.value)}
+                        placeholder="e.g. Weekday mornings"
+                        className="alarm-label-input w-full text-[14px] font-medium"
+                      />
+                    </div>
                   </div>
 
                   {/* Sound */}
-                  <div>
-                    <label className="block text-[12px] font-medium text-zinc-400 mb-2">Sound</label>
-                    <div className="grid grid-cols-2 gap-2">
+                  <div className="alarm-sound-field">
+                    <p id="alarm-sound-label" className="alarm-field-label block text-[12px] font-medium text-zinc-400 mb-2">Sound</p>
+                    <div className="sound-options" role="group" aria-labelledby="alarm-sound-label">
                       {SOUND_LABELS.map((snd) => {
                         const isSelected = snd.key === newSoundType;
                         const isPreviewing = previewPlaying === snd.key;
                         return (
                           <div
                             key={snd.key}
-                            className={`flex items-center gap-2 p-2.5 rounded-xl border transition-colors ${
-                              isSelected
-                                ? 'border-[#FF8A42]/50 bg-[#FF8A42]/10'
-                                : 'border-white/[0.06] bg-white/[0.03]'
-                            }`}
+                            className={`sound-option ${isSelected ? 'is-selected' : ''} ${isPreviewing ? 'is-previewing' : ''}`}
                           >
-                            {/* Tapping the label selects this sound */}
                             <button
                               type="button"
                               onClick={() => setNewSoundType(snd.key as Alarm['soundType'])}
-                              className={`flex-1 text-[13px] font-medium text-left ${isSelected ? 'text-[#FFB37A]' : 'text-zinc-300'}`}
+                              aria-pressed={isSelected}
+                              className="sound-option-select"
                             >
-                              {snd.label}
+                              <span className="sound-option-glyph" aria-hidden="true">
+                                <Volume2 className="w-[17px] h-[17px]" />
+                              </span>
+                              <span className="sound-option-name">{snd.label}</span>
                             </button>
-                            {/* Preview button also selects this sound, then plays it */}
                             <button
                               type="button"
                               onClick={() => {
                                 setNewSoundType(snd.key as Alarm['soundType']);
                                 handlePreviewSound(snd.key);
                               }}
-                              className={`p-1.5 rounded-lg border transition-colors shrink-0 ${
-                                isPreviewing
-                                  ? 'bg-[#FF8A42]/20 border-[#FF8A42]/40 text-[#FFB37A]'
-                                  : 'bg-white/[0.04] border-white/[0.08] text-zinc-400'
-                              }`}
+                              aria-label={`${isPreviewing ? 'Stop' : 'Preview'} ${snd.label}`}
+                              className={`sound-option-preview ${isPreviewing ? 'is-playing' : ''}`}
                               title={isPreviewing ? 'Stop preview' : 'Preview sound'}
                             >
                               {isPreviewing ? <Square className="w-3 h-3" /> : <Play className="w-3 h-3" />}
@@ -336,8 +435,8 @@ export default function Dashboard({
 
                   {/* Repeat */}
                   <div>
-                    <label className="block text-[12px] font-medium text-zinc-400 mb-2">Repeat</label>
-                    <div className="flex justify-between gap-1">
+                    <p id="alarm-repeat-label" className="block text-[12px] font-medium text-zinc-400 mb-2">Repeat</p>
+                    <div className="flex justify-between gap-1 repeat-picker" role="group" aria-labelledby="alarm-repeat-label">
                       {daysLabels.map((label, dayIndex) => {
                         const active = newDays.includes(dayIndex);
                         return (
@@ -345,7 +444,9 @@ export default function Dashboard({
                             key={dayIndex}
                             type="button"
                             onClick={() => handleToggleDay(dayIndex)}
-                            className={`w-9 h-9 rounded-full text-[12px] font-medium transition-all ${
+                            aria-label={['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayIndex]}
+                            aria-pressed={active}
+                            className={`w-12 h-12 rounded-full text-[12px] font-medium transition-colors ${
                               active
                                 ? 'glass-button-glow'
                                 : 'glass-button text-zinc-400'
@@ -361,7 +462,7 @@ export default function Dashboard({
                   <button
                     type="submit"
                     disabled={newDays.length === 0}
-                    className={`w-full py-3.5 rounded-2xl font-sans font-semibold text-[15px] transition-all ${newDays.length > 0
+                    className={`w-full py-3.5 rounded-2xl font-sans font-semibold text-[15px] transition-colors ${newDays.length > 0
                         ? 'glass-button-glow cursor-pointer'
                         : 'bg-white/[0.04] text-zinc-500 border border-dashed border-white/[0.08] cursor-not-allowed'
                       }`}

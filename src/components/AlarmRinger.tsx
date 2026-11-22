@@ -11,22 +11,13 @@ import {
 } from 'lucide-react';
 import { Alarm } from '../types';
 import { gingAudio } from '../utils/audio';
-import { Capacitor, registerPlugin } from '@capacitor/core';
-
-interface GingAndroidPlugin {
-  setAlarmActive(options: { active: boolean }): Promise<void>;
-  forceMaxVolume(): Promise<void>;
-  checkBatteryBypass(): Promise<{ granted: boolean }>;
-  requestBatteryBypass(): Promise<{ requested: boolean }>;
-  checkOverlayPermission(): Promise<{ granted: boolean }>;
-  requestOverlayPermission(): Promise<{ requested: boolean }>;
-}
-
-const GingAndroid = registerPlugin<GingAndroidPlugin>('GingAndroid');
+import { matchesWakeUpCode } from '../utils/qrValidation';
+import { Capacitor } from '@capacitor/core';
+import { GingAndroid } from '../native/GingAndroid';
 
 interface AlarmRingerProps {
   alarm: Alarm;
-  onDismiss: (success: boolean) => void;
+  onDismiss: () => void;
 }
 
 export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
@@ -42,17 +33,27 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
   const [errorText, setErrorText] = useState<string | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraLabel, setCameraLabel] = useState('Default Camera');
-  const [currentScannedVal, setCurrentScannedVal] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const loopRef = useRef<number | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const cameraRequestIdRef = useRef(0);
+  const isMountedRef = useRef(false);
+  const endedTrackRef = useRef<{ track: MediaStreamTrack; listener: () => void } | null>(null);
+  const lastScanAtRef = useRef(0);
+  const dismissTimerRef = useRef<number | null>(null);
+  const wrongCodeTimerRef = useRef<number | null>(null);
 
   // Sound triggering and live clock
   useEffect(() => {
     // Start playing the brutal audio on load at absolute maximum volume!
-    gingAudio.start(alarm.soundType, 1.0);
+    try {
+      gingAudio.start(alarm.soundType, 1.0);
+    } catch (err) {
+      // Keep applying the native alarm lock even if Web Audio is unavailable.
+      console.error('Alarm audio could not start:', err);
+    }
 
     let volumeGuardInterval: number | null = null;
 
@@ -78,6 +79,8 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
     return () => {
       clearInterval(interval);
       if (volumeGuardInterval) clearInterval(volumeGuardInterval);
+      if (dismissTimerRef.current) window.clearTimeout(dismissTimerRef.current);
+      if (wrongCodeTimerRef.current) window.clearTimeout(wrongCodeTimerRef.current);
       gingAudio.stop();
       stopCamera();
 
@@ -88,189 +91,206 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
     };
   }, [alarm]);
 
-  // Handle bootstrap camera feed
+  // Handle bootstrap camera feed and invalidate in-flight permission requests on unmount.
   useEffect(() => {
-    startCamera();
+    isMountedRef.current = true;
+    void startCamera();
     return () => {
-      stopCamera();
+      isMountedRef.current = false;
+      stopCamera(false);
     };
   }, []);
 
   const startCamera = async () => {
+    stopCamera();
+    const requestId = cameraRequestIdRef.current;
+    const isCurrentRequest = () => isMountedRef.current && cameraRequestIdRef.current === requestId;
+    let acquiredStream: MediaStream | null = null;
+
     try {
       setErrorText(null);
-      // Stop anything running
-      stopCamera();
+      updateScanStatus('scanning');
 
-      let stream: MediaStream;
       try {
         // First choice: High Quality back camera constraints suitable for QR scan
         const constraints: MediaStreamConstraints = {
           video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
         };
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        acquiredStream = await navigator.mediaDevices.getUserMedia(constraints);
       } catch (firstErr) {
+        if (!isCurrentRequest()) return;
         console.warn("High-quality back camera failed, trying simple video: true fallback. Info:", firstErr);
         // Fallback to simple generic video constraints
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        acquiredStream = await navigator.mediaDevices.getUserMedia({ video: true });
       }
 
-      mediaStreamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.setAttribute('playsinline', 'true'); // helpful for mobile browsers
-        videoRef.current.play();
-        setIsCameraActive(true);
-
-        // Find human readable camera name
-        try {
-          const tracks = stream.getVideoTracks();
-          if (tracks.length > 0) {
-            setCameraLabel(tracks[0].label || 'Default Camera');
-            console.log('Using camera device:', tracks[0].label);
-          }
-        } catch (e) { }
-
-        // Launch QR analytical loop
-        loopRef.current = requestAnimationFrame(qrScanTick);
+      if (!isCurrentRequest()) {
+        acquiredStream.getTracks().forEach(track => track.stop());
+        return;
       }
+
+      const video = videoRef.current;
+      const videoTrack = acquiredStream.getVideoTracks()[0];
+      if (!video || !videoTrack) {
+        throw new Error('Camera stream is missing its video element or video track.');
+      }
+
+      mediaStreamRef.current = acquiredStream;
+      const onTrackEnded = () => {
+        if (mediaStreamRef.current !== acquiredStream || !isMountedRef.current) return;
+        showCameraError('The camera feed stopped. Restart the camera to keep scanning.');
+      };
+      videoTrack.addEventListener('ended', onTrackEnded);
+      endedTrackRef.current = { track: videoTrack, listener: onTrackEnded };
+
+      video.srcObject = acquiredStream;
+      video.setAttribute('playsinline', 'true'); // helpful for mobile browsers
+      await video.play();
+      if (!isCurrentRequest() || mediaStreamRef.current !== acquiredStream) return;
+      setIsCameraActive(true);
+
+      setCameraLabel(videoTrack.label || 'Default Camera');
+      console.log('Using camera device:', videoTrack.label);
+
+      scheduleScanFrame();
     } catch (err: any) {
+      if (acquiredStream && mediaStreamRef.current !== acquiredStream) {
+        acquiredStream.getTracks().forEach(track => track.stop());
+      }
+      if (!isCurrentRequest()) return;
       console.error("Camera startup fully failed:", err);
-      setErrorText(
-        `Unable to start camera: ${err?.message || err?.name || 'Could not start video source'}. Please allow camera access in your device settings.`
-      );
+      showCameraError("Couldn't start the camera. Check camera access or close another app using it, then try again.");
     }
   };
 
-  const stopCamera = () => {
-    if (loopRef.current) {
+  const stopCamera = (updateState = true) => {
+    cameraRequestIdRef.current += 1;
+    if (loopRef.current !== null) {
       cancelAnimationFrame(loopRef.current);
       loopRef.current = null;
     }
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => track.stop());
-      mediaStreamRef.current = null;
+    if (endedTrackRef.current) {
+      endedTrackRef.current.track.removeEventListener('ended', endedTrackRef.current.listener);
+      endedTrackRef.current = null;
     }
-    setIsCameraActive(false);
+    const stream = mediaStreamRef.current;
+    mediaStreamRef.current = null;
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      if (videoRef.current?.srcObject === stream) videoRef.current.srcObject = null;
+    }
+    if (updateState && isMountedRef.current) setIsCameraActive(false);
   };
 
-  // Safety net: reattach the media stream to the video element if it gets disconnected
-  // This handles edge cases like React re-renders, AnimatePresence transitions, etc.
-  const ensureVideoStreamConnected = () => {
-    if (videoRef.current && mediaStreamRef.current && !videoRef.current.srcObject) {
-      console.warn('[GING] Video element lost stream connection — reattaching.');
-      videoRef.current.srcObject = mediaStreamRef.current;
-      videoRef.current.play().catch(e => console.error('[GING] Video play failed on reattach:', e));
-      if (!isCameraActive) setIsCameraActive(true);
-    }
+  const showCameraError = (message: string) => {
+    stopCamera();
+    updateScanStatus('scanning');
+    if (isMountedRef.current) setErrorText(message);
   };
 
-  // Whenever scan status transitions back to 'scanning', ensure the video stream is live
-  useEffect(() => {
-    if (scanStatus === 'scanning') {
-      ensureVideoStreamConnected();
-
-      // Also restart the scan loop if it died for any reason
-      if (!loopRef.current && mediaStreamRef.current) {
-        console.log('[GING] Restarting QR scan loop after status reset to scanning.');
-        loopRef.current = requestAnimationFrame(qrScanTick);
-      }
-    }
-  }, [scanStatus]);
+  const scheduleScanFrame = () => {
+    if (!isMountedRef.current || !mediaStreamRef.current || loopRef.current !== null || scanStatusRef.current === 'authenticated') return;
+    loopRef.current = requestAnimationFrame(qrScanTick);
+  };
 
   // QR scanning recursive routine using off-screen canvas rendering + jsQR decoding
   const qrScanTick = () => {
+    loopRef.current = null;
     // If we've been authenticated, stop the loop permanently
-    if (scanStatusRef.current === 'authenticated') {
+    if (!isMountedRef.current || scanStatusRef.current === 'authenticated') return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const stream = mediaStreamRef.current;
+    if (!video || !canvas || !stream || !stream.active) {
+      showCameraError('The camera feed is unavailable. Restart the camera to keep scanning.');
       return;
     }
 
-    if (!videoRef.current || !canvasRef.current || !mediaStreamRef.current) {
-      loopRef.current = requestAnimationFrame(qrScanTick);
-      return;
-    }
-
-    // Safety: reattach stream if video element lost its source (e.g., after React remount)
-    if (!videoRef.current.srcObject && mediaStreamRef.current) {
-      console.warn('[GING] qrScanTick detected disconnected video — reattaching stream.');
-      videoRef.current.srcObject = mediaStreamRef.current;
-      videoRef.current.play().catch(e => console.error('[GING] Video play failed:', e));
-      if (!isCameraActive) setIsCameraActive(true);
+    if (video.srcObject !== stream) {
+      video.srcObject = stream;
+      video.play().catch(err => {
+        console.error('[GING] Video playback stopped:', err);
+        showCameraError('The camera preview stopped. Restart the camera to keep scanning.');
+      });
     }
 
     // Pause frame decoding while showing incorrect-code error (but keep the loop alive!)
     if (scanStatusRef.current !== 'scanning') {
-      loopRef.current = requestAnimationFrame(qrScanTick);
+      scheduleScanFrame();
       return;
     }
 
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    try {
+      const now = performance.now();
+      if (now - lastScanAtRef.current < 80) {
+        scheduleScanFrame();
+        return;
+      }
+      lastScanAtRef.current = now;
 
-    if (video.readyState === video.HAVE_ENOUGH_DATA && ctx) {
-      // Scale canvas to match source video
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas 2D context is unavailable.');
+      if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0 && video.videoHeight > 0) {
+        // Bound work on high-resolution phone cameras while keeping enough detail for QR decoding.
+        const scale = Math.min(1, 720 / Math.max(video.videoWidth, video.videoHeight));
+        canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+        canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
 
-      // Draw active frame
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        // Draw active frame and decode the exact payload.
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: 'dontInvert',
+        });
 
-      // Perform pixel mapping analysis
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: 'dontInvert',
-      });
+        if (code) {
+          if (matchesWakeUpCode(code.data, alarm.qrSecret)) {
+            // CORRECT QR CODE MATCHED!
+            updateScanStatus('authenticated');
+            stopCamera();
 
-      if (code) {
-        const decodedVal = code.data.trim();
-        console.log('Decoded code:', decodedVal, 'Expected secret:', alarm.qrSecret);
-        setCurrentScannedVal(decodedVal);
+            // Sound off!
+            gingAudio.stop();
 
-        if (decodedVal === alarm.qrSecret.trim()) {
-          // CORRECT QR CODE MATCHED!
-          updateScanStatus('authenticated');
-          stopCamera();
+            // Play a short voice confirmation if speech synthesis is available.
+            try {
+              if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const authUtterance = new SpeechSynthesisUtterance("Alarm off.");
+                authUtterance.lang = 'en-US';
+                authUtterance.volume = 1.0;
+                window.speechSynthesis.speak(authUtterance);
+              }
+            } catch (e) { }
 
-          // Sound off!
-          gingAudio.stop();
-
-          // Play high success sound chime or TTS
-          try {
-            if ('speechSynthesis' in window) {
-              window.speechSynthesis.cancel();
-              const authUtterance = new SpeechSynthesisUtterance("Wake up authenticated! Good job getting out of bed!");
-              authUtterance.lang = 'en-US';
-              authUtterance.volume = 1.0;
-              window.speechSynthesis.speak(authUtterance);
-            }
-          } catch (e) { }
-
-          // End the loop and trigger success callback to parent
-          setTimeout(() => {
-            onDismiss(true);
-          }, 2400);
-          return;
-        } else {
-          // Wrong QR code (like a cereal box, product code, etc.)
-          updateScanStatus('wrong-code');
-
-          // Reset warning status after a short delay so scanning can proceed
-          setTimeout(() => {
-            if (scanStatusRef.current === 'wrong-code') {
-              updateScanStatus('scanning');
-            }
-          }, 2500);
+            // End the loop and trigger success callback to parent.
+            dismissTimerRef.current = window.setTimeout(() => {
+              onDismiss();
+              dismissTimerRef.current = null;
+            }, 2400);
+            return;
+          } else {
+            // Any other QR payload leaves the alarm active and resumes scanning shortly.
+            updateScanStatus('wrong-code');
+            wrongCodeTimerRef.current = window.setTimeout(() => {
+              if (scanStatusRef.current === 'wrong-code') updateScanStatus('scanning');
+              wrongCodeTimerRef.current = null;
+            }, 2500);
+          }
         }
       }
+    } catch (err) {
+      console.error('[GING] QR frame could not be analyzed:', err);
+      showCameraError('The camera could not read this frame. Restart the camera to keep scanning.');
+      return;
     }
 
-    loopRef.current = requestAnimationFrame(qrScanTick);
+    scheduleScanFrame();
   };
 
   return (
-    <div className="relative min-h-screen text-white select-none flex flex-col overflow-x-hidden font-sans ambient-glow-bg">
+    <div className="relative min-h-dvh text-white select-none flex flex-col overflow-x-hidden font-sans ambient-glow-bg ging-screen ging-screen--ringing">
       {/* Hidden processing canvas used for frame analysis */}
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
@@ -279,45 +299,50 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
       <div className="glow-sphere-orange bottom-[-15%] right-[-10%] opacity-50" />
 
       {/* Header */}
-      <div className="max-w-md w-full mx-auto flex items-center justify-between px-6 pt-5 pb-3 z-10">
-        <span className="font-sans font-semibold text-[17px] text-white tracking-tight">
-          {alarm.label || 'Alarm'}
-        </span>
-        <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium ${scanStatus === 'authenticated' ? 'glass-badge-green' : 'glass-badge-red'}`}>
-          <span className={`w-1.5 h-1.5 rounded-full soft-pulse ${scanStatus === 'authenticated' ? 'bg-emerald-400' : 'bg-ging-red'}`} />
-          <span>{scanStatus === 'authenticated' ? 'Verified' : 'Ringing'}</span>
+      <div className="max-w-md w-full mx-auto flex items-center justify-between px-6 pt-5 pb-3 z-10 ringing-header">
+        <div className="ringing-title">
+          <img src="/gingy-mascot-cutout.webp" alt="" aria-hidden="true" className="ringing-mascot" />
+          <span className="font-sans font-semibold text-[17px] text-white tracking-tight truncate">
+            {alarm.label || 'Alarm'}
+          </span>
         </div>
+        {scanStatus !== 'authenticated' && (
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium glass-badge-red">
+            <span className="w-1.5 h-1.5 rounded-full soft-pulse bg-ging-red" />
+            <span>Ringing</span>
+          </div>
+        )}
       </div>
 
       {/* Main */}
-      <div className="flex-1 max-w-md w-full mx-auto px-6 py-4 flex flex-col z-10 space-y-5">
+      <div className="flex-1 max-w-md w-full mx-auto px-6 py-4 flex flex-col z-10 space-y-5 ringing-main">
 
         {/* Big clock */}
-        <div className="text-center">
+        <div className="text-center ringing-time">
           <h2 className="text-[56px] font-semibold tracking-tight text-white tabular-nums">
             {currentTimeStr || '--:--'}
           </h2>
         </div>
 
         {/* Camera viewport — always mounted so the stream is never disconnected */}
-        <div className="relative glass-card rounded-3xl overflow-hidden">
-          <div className="aspect-[3/4] relative bg-black">
+        <div className="relative glass-card rounded-3xl overflow-hidden ringing-camera">
+          <div className="aspect-[3/4] relative bg-black ringing-camera-view">
             {!isCameraActive && !errorText && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-500 gap-3 p-4 text-center z-10">
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-500 gap-3 p-4 text-center z-10 camera-loading">
                 <RefreshCw className="w-8 h-8 animate-spin text-zinc-400" />
                 <span className="text-[13px] text-zinc-400 font-medium">Starting camera…</span>
               </div>
             )}
 
             {errorText && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-red-300 gap-3 overflow-y-auto z-20">
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-red-300 gap-3 overflow-y-auto z-20 camera-error" role="alert">
                 <div className="w-12 h-12 rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center shrink-0">
                   <Ban className="w-6 h-6 text-red-400" />
                 </div>
                 <span className="text-[13px] text-zinc-300 leading-relaxed font-medium">{errorText}</span>
 
                 <button
-                  onClick={startCamera}
+                  onClick={() => void startCamera()}
                   className="w-full max-w-xs text-[14px] glass-button font-medium py-3 rounded-xl transition-transform active:scale-95 mt-1"
                 >
                   Retry camera
@@ -360,13 +385,16 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
                   className="absolute inset-0 z-30 flex items-center justify-center bg-black/50"
                 >
                   <div className="glass-card border-emerald-500/25 p-6 text-center w-[80%] rounded-2xl">
+                    <img
+                      src="/gingy-mascot-cutout.webp"
+                      alt=""
+                      aria-hidden="true"
+                      className="ringing-success-mascot"
+                    />
                     <div className="w-12 h-12 rounded-full bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center mx-auto mb-3 text-emerald-300">
                       <CheckCircle className="w-7 h-7" />
                     </div>
-                    <h3 className="text-[17px] font-semibold text-white">Wake up verified</h3>
-                    <p className="text-[13px] text-zinc-400 mt-1.5">
-                      Code matches. Great start to your morning.
-                    </p>
+                    <h3 className="text-[17px] font-semibold text-white">Alarm off</h3>
                   </div>
                 </motion.div>
               )}
@@ -385,7 +413,7 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
                     </div>
                     <h3 className="text-[17px] font-semibold text-white">Wrong code</h3>
                     <p className="text-[13px] text-zinc-400 mt-1.5">
-                      That isn't your wake-up code. Find the right one.
+                      Scan the QR code for this alarm.
                     </p>
                   </div>
                 </motion.div>
@@ -394,18 +422,22 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
           </div>
 
           {/* Camera status strip — integrated into glass-card border */}
-          <div className="px-4 py-2.5 flex justify-between items-center text-[12px] border-t border-white/[0.06]">
-            <span className="truncate max-w-[200px] text-zinc-500">{cameraLabel}</span>
-            <span className={`font-medium tabular-nums ${scanStatus === 'wrong-code' ? 'text-red-400' : scanStatus === 'authenticated' ? 'text-emerald-400' : 'text-ging-orange'}`}>
-              {scanStatus === 'wrong-code' ? 'Retrying' : scanStatus === 'authenticated' ? 'Verified' : 'Scanning'}
-            </span>
-          </div>
+          {scanStatus !== 'authenticated' && (
+            <div className="px-4 py-2.5 flex justify-between items-center text-[12px] border-t border-white/[0.06]">
+              <span className="truncate max-w-[200px] text-zinc-500">{cameraLabel}</span>
+              <span className={`font-medium tabular-nums ${errorText || scanStatus === 'wrong-code' ? 'text-red-400' : 'text-ging-orange'}`}>
+                {errorText ? 'Camera unavailable' : scanStatus === 'wrong-code' ? 'Retrying' : 'Scanning'}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Help hint — single subtle line */}
-        <p className="text-center text-[13px] text-zinc-500 font-medium pb-2">
-          Scan your QR code to turn off the alarm
-        </p>
+        {scanStatus !== 'wrong-code' && (
+          <p className="text-center text-[13px] text-zinc-500 font-medium pb-2 ringing-hint">
+            Scan your QR code to turn off the alarm
+          </p>
+        )}
       </div>
     </div>
   );

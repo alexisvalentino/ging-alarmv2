@@ -3,13 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
+import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { Alarm, PermissionItem, AppState } from './types';
 import Splash from './components/Splash';
-import PermissionsSetup from './components/PermissionsSetup';
-import QRCodeManager from './components/QRCodeManager';
-import Dashboard from './components/Dashboard';
-import AlarmRinger from './components/AlarmRinger';
+import StartupScreen from './components/StartupScreen';
+
+const PermissionsSetup = lazy(() => import('./components/PermissionsSetup'));
+const QRCodeManager = lazy(() => import('./components/QRCodeManager'));
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const AlarmRinger = lazy(() => import('./components/AlarmRinger'));
 
 // Helper to generate a random high-entropy human-readable wake up secret
 const generateRandomSecret = () => {
@@ -25,8 +28,8 @@ const initialPermissions: PermissionItem[] = [
   {
     id: 'p1',
     key: 'camera',
-    title: 'Camera Device Ingress',
-    description: 'Bridges to local browser stream handles. Decodes QR matrix pixel blocks in under 15 milliseconds.',
+    title: 'Camera access',
+    description: 'Scan QR to stop your alarm.',
     urgency: 'CRITICAL & MANDATORY',
     isSimulated: false,
     granted: false
@@ -34,8 +37,8 @@ const initialPermissions: PermissionItem[] = [
   {
     id: 'p2',
     key: 'audio',
-    title: 'Web Audio Autoplay Engine',
-    description: 'Initializes AudioContext audio bands. Forces the speaker buffer to sound on high persistent gains.',
+    title: 'Alarm audio',
+    description: 'Play sound when it rings.',
     urgency: 'CRITICAL & MANDATORY',
     isSimulated: false,
     granted: false
@@ -43,8 +46,8 @@ const initialPermissions: PermissionItem[] = [
   {
     id: 'p3',
     key: 'overlay',
-    title: 'Display Over Other Windows',
-    description: 'Pops alarm screen explicitly over other browser drawers to disable swipe-away or sleep actions.',
+    title: 'Show over other apps',
+    description: 'Keep alarm above other apps.',
     urgency: 'HIGH PRIOR',
     isSimulated: false,
     granted: false
@@ -52,8 +55,8 @@ const initialPermissions: PermissionItem[] = [
   {
     id: 'p4',
     key: 'battery',
-    title: 'Ignore Battery Optimizations',
-    description: 'Bypasses standard Doze parameters. Retains CPU wake schedules so alarms trigger precisely.',
+    title: 'Background activity',
+    description: 'Keep alarms on schedule.',
     urgency: 'CRITICAL & MANDATORY',
     isSimulated: false,
     granted: false
@@ -61,8 +64,8 @@ const initialPermissions: PermissionItem[] = [
   {
     id: 'p5',
     key: 'lockscreen',
-    title: 'Wake Up Lock Screen System',
-    description: 'Bypasses black backlight standby grids to force illuminate screen matrices in high danger flashes.',
+    title: 'Wake screen',
+    description: 'Wake screen at alarm time.',
     urgency: 'RECOMMENDED',
     isSimulated: false,
     granted: false
@@ -70,8 +73,8 @@ const initialPermissions: PermissionItem[] = [
   {
     id: 'p6',
     key: 'notification',
-    title: 'Permanent Foreground Service',
-    description: 'Anchors a resident tracking loop. Prevents Android Low Memory Daemons from purging sleep alarms.',
+    title: 'Alarm notification',
+    description: 'Show alarm notifications.',
     urgency: 'CRITICAL & MANDATORY',
     isSimulated: false,
     granted: false
@@ -80,6 +83,7 @@ const initialPermissions: PermissionItem[] = [
 
 export default function App() {
   const lastTriggeredMinuteRef = useRef<string>('');
+  const qrReturnViewRef = useRef<AppState['currentView']>('permissions');
   const [state, setState] = useState<AppState>(() => {
     // Attempt local storage cache retrieval
     const cached = localStorage.getItem('GING_WAKEUPS_APPSTORE_STATE');
@@ -89,6 +93,7 @@ export default function App() {
         // Ensure properties exist
         const hasOnboarded = parsed.hasCompletedOnboarding || false;
         const rawPermissions = parsed.permissions || initialPermissions;
+        const pendingAlarm: Alarm | null = hasOnboarded ? parsed.activeRingingAlarm || null : null;
 
         // Force reset to false if onboarding is not completed to ensure they are prompted
         const freshPermissions = hasOnboarded
@@ -96,9 +101,9 @@ export default function App() {
           : initialPermissions.map(p => ({ ...p, granted: false }));
 
         return {
-          currentView: hasOnboarded ? 'dashboard' : 'splash',
+          currentView: pendingAlarm ? 'ringing' : hasOnboarded ? 'dashboard' : 'splash',
           hasCompletedOnboarding: hasOnboarded,
-          activeRingingAlarm: null,
+          activeRingingAlarm: pendingAlarm,
           alarms: parsed.alarms || [],
           permissions: freshPermissions,
           userQRSecret: parsed.userQRSecret || generateRandomSecret(),
@@ -116,10 +121,10 @@ export default function App() {
       {
         id: 'default-morning',
         time: '06:00',
-        label: 'Bathroom Mirror Session',
+        label: 'Morning alarm',
         active: true,
         days: [1, 2, 3, 4, 5], // Monday through Friday
-        volume: 0.9,
+        volume: 1.0,
         soundType: 'industrial',
         qrSecret: defaultSecret
       }
@@ -136,6 +141,17 @@ export default function App() {
       lastWakeUpTime: null
     };
   });
+  const [isStartupLoading, setIsStartupLoading] = useState(true);
+
+  useEffect(() => {
+    if (state.currentView === 'ringing' && state.activeRingingAlarm) {
+      setIsStartupLoading(false);
+      return;
+    }
+
+    const startupTimer = window.setTimeout(() => setIsStartupLoading(false), 700);
+    return () => window.clearTimeout(startupTimer);
+  }, [state.activeRingingAlarm, state.currentView]);
 
   // Keep state synchronized with local storage for persistence
   useEffect(() => {
@@ -145,9 +161,30 @@ export default function App() {
       permissions: state.permissions,
       userQRSecret: state.userQRSecret,
       streak: state.streak,
-      lastWakeUpTime: state.lastWakeUpTime
+      lastWakeUpTime: state.lastWakeUpTime,
+      activeRingingAlarm: state.activeRingingAlarm
     }));
   }, [state]);
+
+  useEffect(() => {
+    const handleNativeBack = (event: Event) => {
+      if (state.currentView === 'ringing') {
+        event.preventDefault();
+        return;
+      }
+
+      if (state.currentView === 'permissions') {
+        event.preventDefault();
+        setState(prev => ({ ...prev, currentView: 'splash' }));
+      } else if (state.currentView === 'setup-qr') {
+        event.preventDefault();
+        setState(prev => ({ ...prev, currentView: qrReturnViewRef.current }));
+      }
+    };
+
+    window.addEventListener('ging:back', handleNativeBack);
+    return () => window.removeEventListener('ging:back', handleNativeBack);
+  }, [state.currentView]);
 
   // Persistent Alarm Evaluator Tick
   // Evaluates scheduled alarms every 10 seconds to matching current device minute
@@ -179,7 +216,6 @@ export default function App() {
 
       if (triggeredAlarm) {
         lastTriggeredMinuteRef.current = currentAlarmKey;
-        console.log('SCHEDULED WAKE TRIGGERED:', triggeredAlarm);
         setState(prev => ({
           ...prev,
           activeRingingAlarm: triggeredAlarm,
@@ -202,14 +238,18 @@ export default function App() {
     }));
   };
 
-  const handleUpdatePermission = (key: PermissionItem['key'], granted: boolean) => {
-    setState(prev => ({
-      ...prev,
-      permissions: prev.permissions.map(p => p.key === key ? { ...p, granted } : p)
-    }));
-  };
+  const handleUpdatePermission = useCallback((key: PermissionItem['key'], granted: boolean) => {
+    setState(prev => {
+      if (prev.permissions.every(p => p.key !== key || p.granted === granted)) return prev;
+      return {
+        ...prev,
+        permissions: prev.permissions.map(p => p.key === key ? { ...p, granted } : p)
+      };
+    });
+  }, []);
 
   const handleCompletePermissions = () => {
+    qrReturnViewRef.current = 'permissions';
     setState(prev => ({ ...prev, currentView: 'setup-qr' }));
   };
 
@@ -259,72 +299,86 @@ export default function App() {
 
 
   // Successfully waking up and scanning the QR code
-  const handleAlarmDismissed = (success: boolean) => {
-    if (success) {
-      setState(prev => {
-        const todayStr = new Date().toLocaleDateString();
-        const streakUpdated = prev.lastWakeUpTime === todayStr ? prev.streak : prev.streak + 1;
-        return {
-          ...prev,
-          activeRingingAlarm: null,
-          currentView: 'dashboard',
-          streak: streakUpdated,
-          lastWakeUpTime: todayStr
-        };
-      });
-    } else {
-      // Just in case of failure or bypass, return
-      setState(prev => ({
+  const handleAlarmDismissed = () => {
+    // AlarmRinger only calls this after the matching QR code is scanned.
+    setState(prev => {
+      const todayStr = new Date().toLocaleDateString();
+      const streakUpdated = prev.lastWakeUpTime === todayStr ? prev.streak : prev.streak + 1;
+      return {
         ...prev,
         activeRingingAlarm: null,
-        currentView: 'dashboard'
-      }));
-    }
+        currentView: 'dashboard',
+        streak: streakUpdated,
+        lastWakeUpTime: todayStr
+      };
+    });
   };
 
   const handleNavigateToQR = () => {
+    qrReturnViewRef.current = 'dashboard';
     setState(prev => ({ ...prev, currentView: 'setup-qr' }));
   };
 
   return (
-    <div className="min-h-screen bg-black select-none">
-      {state.currentView === 'splash' && (
-        <Splash onContinue={handleCompleteSplash} />
-      )}
+    <MotionConfig reducedMotion="user">
+      <div className="ging-app min-h-dvh select-none">
+        <Suspense fallback={<StartupScreen />}>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={isStartupLoading ? 'startup' : state.currentView}
+              className="min-h-dvh"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, transition: { duration: 0.12 } }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            >
+              {isStartupLoading ? (
+                <StartupScreen />
+              ) : (
+                <>
+                  {state.currentView === 'splash' && (
+                    <Splash onContinue={handleCompleteSplash} />
+                  )}
 
-      {state.currentView === 'permissions' && (
-        <PermissionsSetup
-          permissions={state.permissions}
-          onUpdatePermission={handleUpdatePermission}
-          onComplete={handleCompletePermissions}
-        />
-      )}
+                  {state.currentView === 'permissions' && (
+                    <PermissionsSetup
+                      permissions={state.permissions}
+                      onUpdatePermission={handleUpdatePermission}
+                      onComplete={handleCompletePermissions}
+                    />
+                  )}
 
-      {state.currentView === 'setup-qr' && (
-        <QRCodeManager
-          userQRSecret={state.userQRSecret}
-          onRegenerateSecret={handleRegenerateSecret}
-          onComplete={handleCompleteQRSetup}
-        />
-      )}
+                  {state.currentView === 'setup-qr' && (
+                    <QRCodeManager
+                      userQRSecret={state.userQRSecret}
+                      onRegenerateSecret={handleRegenerateSecret}
+                      onComplete={handleCompleteQRSetup}
+                    />
+                  )}
 
-      {state.currentView === 'dashboard' && (
-        <Dashboard
-          alarms={state.alarms}
-          userQRSecret={state.userQRSecret}
-          onAddAlarm={handleAddAlarm}
-          onToggleAlarm={handleToggleAlarm}
-          onDeleteAlarm={handleDeleteAlarm}
-          onNavigateToQR={handleNavigateToQR}
-        />
-      )}
+                  {state.currentView === 'dashboard' && (
+                    <Dashboard
+                      alarms={state.alarms}
+                      userQRSecret={state.userQRSecret}
+                      onAddAlarm={handleAddAlarm}
+                      onToggleAlarm={handleToggleAlarm}
+                      onDeleteAlarm={handleDeleteAlarm}
+                      onNavigateToQR={handleNavigateToQR}
+                    />
+                  )}
 
-      {state.currentView === 'ringing' && state.activeRingingAlarm && (
-        <AlarmRinger
-          alarm={state.activeRingingAlarm}
-          onDismiss={handleAlarmDismissed}
-        />
-      )}
-    </div>
+                  {state.currentView === 'ringing' && state.activeRingingAlarm && (
+                    <AlarmRinger
+                      alarm={state.activeRingingAlarm}
+                      onDismiss={handleAlarmDismissed}
+                    />
+                  )}
+                </>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </Suspense>
+      </div>
+    </MotionConfig>
   );
 }

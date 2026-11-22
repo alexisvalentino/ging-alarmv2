@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Camera, Music, Rows, BatteryCharging,
@@ -11,17 +11,8 @@ import {
 } from 'lucide-react';
 import { PermissionItem } from '../types';
 import GingLogo from './GingLogo';
-import { Capacitor, registerPlugin } from '@capacitor/core';
-
-interface GingAndroidPlugin {
-  setAlarmActive(options: { active: boolean }): Promise<void>;
-  checkBatteryBypass(): Promise<{ granted: boolean }>;
-  requestBatteryBypass(): Promise<{ requested: boolean }>;
-  checkOverlayPermission(): Promise<{ granted: boolean }>;
-  requestOverlayPermission(): Promise<{ requested: boolean }>;
-}
-
-const GingAndroid = registerPlugin<GingAndroidPlugin>('GingAndroid');
+import { Capacitor } from '@capacitor/core';
+import { GingAndroid } from '../native/GingAndroid';
 
 interface PermissionsSetupProps {
   permissions: PermissionItem[];
@@ -31,11 +22,10 @@ interface PermissionsSetupProps {
 
 export default function PermissionsSetup({ permissions, onUpdatePermission, onComplete }: PermissionsSetupProps) {
   const [activeInfoKey, setActiveInfoKey] = useState<PermissionItem['key'] | null>(null);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const [audioTesting, setAudioTesting] = useState(false);
+  const [setupError, setSetupError] = useState<string | null>(null);
 
   // Automatically re-evaluate native permissions when the user returns to the app from system settings
-  React.useEffect(() => {
+  useEffect(() => {
     const checkNativePermissions = async () => {
       if (Capacitor.isNativePlatform()) {
         try {
@@ -73,14 +63,13 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
 
   // Toggle system permission confirmation
   const handleTogglePermission = async (key: PermissionItem['key'], currentVal: boolean) => {
-    if (currentVal) {
-      onUpdatePermission(key, false);
-      return;
-    }
+    // Permission grants are managed by the OS; tapping an already granted row
+    // cannot revoke them from inside the app.
+    if (currentVal) return;
 
     if (key === 'camera') {
       try {
-        setCameraError(null);
+        setSetupError(null);
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
           stream.getTracks().forEach(track => track.stop());
@@ -90,39 +79,34 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
         }
       } catch (err: any) {
         console.warn("Camera grant failed:", err);
-        setCameraError(
-          `Camera request failed: ${err?.message || 'Access blocked'}. Please check settings.`
-        );
-        if (Capacitor.isNativePlatform()) {
-          onUpdatePermission('camera', false);
-        } else {
-          onUpdatePermission('camera', true);
-        }
+        setSetupError("Couldn't access the camera. Check camera permission or close another app using it, then try again.");
+        onUpdatePermission('camera', false);
       }
     } else if (key === 'audio') {
-      setAudioTesting(true);
       try {
         // @ts-ignore
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (AudioContextClass) {
-          const ctx = new AudioContextClass();
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
+        if (!AudioContextClass) throw new Error('Web Audio is unavailable.');
 
-          osc.frequency.setValueAtTime(1000, ctx.currentTime);
-          gain.gain.setValueAtTime(0.2, ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+        const ctx = new AudioContextClass();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
 
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start();
-          osc.stop(ctx.currentTime + 0.15);
-        }
+        await ctx.resume();
+        osc.frequency.setValueAtTime(1000, ctx.currentTime);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.onended = () => { void ctx.close(); };
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+        onUpdatePermission('audio', true);
       } catch (e) {
         console.warn("Audio Context init failed:", e);
+        setSetupError('Ging could not play the audio check. Check your sound settings and try again.');
       }
-      onUpdatePermission('audio', true);
-      setTimeout(() => setAudioTesting(false), 400);
     } else if (key === 'overlay') {
       if (Capacitor.isNativePlatform()) {
         try {
@@ -130,6 +114,7 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
           await GingAndroid.requestOverlayPermission();
         } catch (e) {
           console.error("Overlay native request failed:", e);
+          setSetupError('Could not open Display over other apps settings. Try again from this screen.');
         }
       } else {
         onUpdatePermission('overlay', true);
@@ -141,6 +126,7 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
           await GingAndroid.requestBatteryBypass();
         } catch (e) {
           console.error("Battery native request failed:", e);
+          setSetupError('Could not open background activity settings. Try again from this screen.');
         }
       } else {
         onUpdatePermission('battery', true);
@@ -150,12 +136,15 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
         if ('Notification' in window) {
           const res = await Notification.requestPermission();
           onUpdatePermission('notification', res === 'granted');
+          if (res !== 'granted') setSetupError('Allow Ging notifications in your device settings to finish setup.');
         } else {
-          onUpdatePermission('notification', true);
+          onUpdatePermission('notification', false);
+          setSetupError('Notifications are not available in this browser. Use the Ging app to finish setup.');
         }
       } catch (e) {
         console.warn("Notification request failed:", e);
-        onUpdatePermission('notification', true);
+        onUpdatePermission('notification', false);
+        setSetupError('Ging could not request notifications. Check your device settings and try again.');
       }
     } else {
       onUpdatePermission(key, true);
@@ -166,33 +155,33 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
   const grantedCount = permissions.filter(p => p.granted).length;
 
   return (
-    <div className="relative min-h-screen ambient-glow-bg text-white flex flex-col justify-between p-6 overflow-x-hidden font-sans">
+    <div className="relative min-h-dvh ambient-glow-bg ging-screen ging-screen--permissions text-white flex flex-col justify-between p-6 overflow-x-hidden font-sans">
       {/* Ambient haze */}
       <div className="glow-sphere-orange top-[-10%] left-[-15%]" />
       <div className="glow-sphere-red bottom-[-15%] right-[-10%]" />
 
       {/* Header */}
-      <div className="max-w-md w-full mx-auto flex items-center justify-between py-3 border-b border-white/[0.06] z-10">
+      <div className="max-w-md w-full mx-auto flex items-center justify-between py-3 border-b border-white/[0.06] z-10 permissions-header">
         <div className="flex items-center gap-2">
           <GingLogo size={32} />
         </div>
-        <span className="text-[13px] font-medium text-zinc-400">
-          {grantedCount}/{permissions.length}
+        <span className="glass-badge rounded-full px-3 py-1.5 text-[13px] font-medium tabular-nums" role="status" aria-live="polite">
+          {grantedCount} of {permissions.length} ready
         </span>
       </div>
 
       {/* Main */}
-      <div className="flex-1 max-w-md w-full mx-auto py-6 z-10 space-y-4">
+      <div className="flex-1 max-w-md w-full mx-auto py-6 z-10 space-y-4 permissions-main">
         {/* Section title + intro (iOS Settings style) */}
-        <div className="px-2">
+        <div className="px-2 permissions-intro">
           <h1 className="text-[28px] font-bold text-white tracking-tight">Permissions</h1>
           <p className="text-[13px] text-zinc-400 mt-1.5 leading-relaxed">
-            These let your alarm ring at full volume, even through Android sleep modes.
+            Set up access to scan your QR code and keep alarms on schedule.
           </p>
         </div>
 
         {/* Permissions grouped list (iOS Settings look) */}
-        <div className="glass-card divide-y divide-white/[0.06] overflow-hidden">
+        <div className="glass-card divide-y divide-white/[0.06] overflow-hidden permissions-rows">
           {permissions.map((p) => {
             const Icon = {
               camera: Camera,
@@ -206,10 +195,10 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
             const expanded = activeInfoKey === p.key;
 
             return (
-              <div key={p.id} className={p.granted ? '' : ''}>
+              <div key={p.id} className="permission-row">
                 <div className="flex items-center gap-3 px-4 py-3.5">
                   {/* Icon tile */}
-                  <div className={`w-7 h-7 rounded-[7px] flex items-center justify-center shrink-0 ${p.granted
+                  <div className={`permission-icon-tile w-7 h-7 rounded-[7px] flex items-center justify-center shrink-0 ${p.granted
                     ? 'bg-emerald-500/20 text-emerald-300'
                     : 'bg-white/[0.08] text-zinc-300'
                   }`}>
@@ -219,10 +208,14 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
                   {/* Title + description */}
                   <button
                     onClick={() => setActiveInfoKey(expanded ? null : p.key)}
-                    className="flex-1 min-w-0 text-left"
+                    aria-expanded={expanded}
+                    className="flex-1 min-w-0 flex items-center gap-2 text-left"
                   >
-                    <span className="font-medium text-[15px] text-white block truncate">{p.title}</span>
-                    <span className="text-[12.5px] text-zinc-400 block truncate">{p.description}</span>
+                    <span className="flex-1 min-w-0">
+                      <span className="font-medium text-[15px] text-white block leading-snug break-words">{p.title}</span>
+                      <span className="text-[12.5px] text-zinc-400 block leading-snug break-words">{p.description}</span>
+                    </span>
+                    <ChevronRight className={`w-4 h-4 shrink-0 text-zinc-500 transition-transform ${expanded ? 'rotate-90' : ''}`} aria-hidden="true" />
                   </button>
 
                   {/* Toggle */}
@@ -231,40 +224,31 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
                     className={`ios-toggle ${p.granted ? 'is-on' : 'is-off'} shrink-0`}
                     aria-pressed={p.granted}
                     aria-label={p.title}
+                    disabled={p.granted}
                   >
                     <span className="ios-toggle__knob" />
                   </button>
 
-                  {/* Info chevron */}
-                  <button
-                    onClick={() => setActiveInfoKey(expanded ? null : p.key)}
-                    className="shrink-0 text-zinc-500 p-1"
-                    aria-label="More info"
-                  >
-                    <ChevronRight className={`w-4 h-4 transition-transform ${expanded ? 'rotate-90' : ''}`} />
-                  </button>
                 </div>
 
-                {/* Info drawer (content preserved verbatim) */}
+                {/* Additional permission details */}
                 <AnimatePresence>
                   {expanded && (
                     <motion.div
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: 'auto', opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden bg-black/25"
+                      className="overflow-hidden permission-info"
                     >
-                      <div className="px-4 py-3.5 pl-14 flex gap-2.5">
+                      <div className="px-4 py-3.5 pl-8 flex items-start gap-2">
                         <Info className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
                         <div className="flex-1 min-w-0 break-words space-y-2 select-text">
                           <div className="text-zinc-300 font-medium text-[12.5px] leading-relaxed w-full break-words whitespace-normal">
-                            {p.key === 'camera' && "Ging reads your QR code with a secure, on-device camera pipeline. Your video is analyzed locally and never sent anywhere."}
-                            {p.key === 'audio' && "Unlocks the audio channel so your alarm sounds immediately at full volume, without browser autoplay blocks."}
+                            {p.key === 'camera' && "Your camera feed stays on your device. Ging reads the QR locally and never uploads video."}
+                            {p.key === 'audio' && "Lets Ging start alarm audio immediately, without waiting for another tap."}
                             {p.key === 'overlay' && (
                               <div className="space-y-2 w-full break-words">
-                                <p className="whitespace-normal leading-relaxed">Lets the alarm appear over your lock screen and other apps, so you can't swipe it away or skip the QR scan.</p>
-
-                                <div className="mt-2.5 p-3.5 bg-white/[0.05] border border-white/[0.08] rounded-xl text-zinc-300 space-y-2 w-full break-words">
+                                <div className="p-3.5 bg-white/[0.05] border border-white/[0.08] rounded-xl text-zinc-300 space-y-2 w-full break-words">
                                   <span className="font-semibold text-[11px] text-zinc-200 block leading-relaxed whitespace-normal">
                                     If Android shows "restricted settings":
                                   </span>
@@ -272,7 +256,7 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
                                     <li>Open your phone's <span className="text-white">Settings</span> app.</li>
                                     <li>Go to <span className="text-white">Apps</span> and select <span className="text-white">Ging</span>.</li>
                                     <li>Tap the <span className="text-white">three dots (⋮)</span> in the top-right.</li>
-                                    <li>Tap <span className="text-[#FFB37A] font-semibold">Allow restricted settings</span>.</li>
+                                    <li>Tap <span className="text-ging-burnt font-semibold">Allow restricted settings</span>.</li>
                                     <li>Confirm with your PIN, pattern, or fingerprint.</li>
                                   </ol>
                                   <span className="block text-[11px] text-zinc-500 italic mt-1 leading-normal font-medium whitespace-normal">
@@ -281,9 +265,9 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
                                 </div>
                               </div>
                             )}
-                            {p.key === 'battery' && "Tells Android to keep Ging's timer running during deep sleep so your alarm fires on time."}
-                            {p.key === 'lockscreen' && "Wakes your screen and turns on the backlight when the alarm fires, even if your phone is locked."}
-                            {p.key === 'notification' && "Keeps a lightweight background service alive so Android's memory cleaner doesn't kill your alarm."}
+                            {p.key === 'battery' && "Android may pause background apps to save power. This access helps Ging keep its timer active."}
+                            {p.key === 'lockscreen' && "This wakes the display without unlocking your phone."}
+                            {p.key === 'notification' && "Android may show an ongoing Ging notification while alarms are scheduled."}
                           </div>
                         </div>
                       </div>
@@ -295,38 +279,35 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
           })}
         </div>
 
-        {cameraError && (
-          <div className="p-3.5 bg-red-500/10 border border-red-500/25 rounded-2xl text-[12.5px] text-red-300 flex items-start gap-2 font-medium">
-            <Camera className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
-            <span>{cameraError}</span>
-          </div>
-        )}
+        <AnimatePresence initial={false}>
+          {setupError && (
+            <motion.div
+              key="permission-error"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -3 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+              className="p-3.5 bg-red-500/10 border border-red-500/25 rounded-2xl text-[12.5px] text-red-300 flex items-start gap-2 font-medium"
+            >
+              <Info className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
+              <span role="alert">{setupError}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Footer CTA */}
-      <div className="max-w-md w-full mx-auto mt-6 flex flex-col gap-3 z-10">
-        {!allReady && (
-          <div className="text-center text-[13px] text-zinc-400 font-medium px-2">
-            Enable all {permissions.length} permissions to continue
-          </div>
-        )}
-
+      <div className="max-w-md w-full mx-auto mt-6 flex flex-col gap-3 z-10 permissions-footer">
         <button
           onClick={allReady ? onComplete : undefined}
           disabled={!allReady}
-          className={`w-full py-4 rounded-2xl font-sans font-semibold text-[15px] flex items-center justify-center gap-2 transition-all ${allReady
+          className={`w-full py-4 rounded-2xl font-sans font-semibold text-[15px] flex items-center justify-center gap-2 transition-colors ${allReady
               ? 'glass-button-glow cursor-pointer'
-              : 'bg-white/[0.04] text-zinc-500 border border-dashed border-white/[0.08] cursor-not-allowed'
+              : 'permission-continue-disabled cursor-not-allowed'
             }`}
         >
-          {allReady ? (
-            <>
-              <span>Continue</span>
-              <ChevronRight className="w-4 h-4" />
-            </>
-          ) : (
-            <span>{grantedCount} of {permissions.length} enabled</span>
-          )}
+          <span>Continue</span>
+          <ChevronRight className="w-4 h-4" />
         </button>
       </div>
     </div>

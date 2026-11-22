@@ -46,18 +46,29 @@ function Wheel({
   items,
   index,
   onIndexChange,
+  label,
   width,
   format = (x) => String(x),
 }: {
   items: (string | number)[];
   index: number;
   onIndexChange: (i: number) => void;
+  label: string;
   width: string;
   format?: (x: string | number) => string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const programmaticRef = useRef(false);
   const scrollTimer = useRef<number | null>(null);
+  const programmaticTimer = useRef<number | null>(null);
+
+  const allowUserScrollAfter = (delay: number) => {
+    if (programmaticTimer.current) window.clearTimeout(programmaticTimer.current);
+    programmaticTimer.current = window.setTimeout(() => {
+      programmaticRef.current = false;
+      programmaticTimer.current = null;
+    }, delay);
+  };
 
   // Center the selected item when it changes externally (mount / preset tap).
   useEffect(() => {
@@ -66,12 +77,16 @@ function Wheel({
     programmaticRef.current = true;
     el.scrollTop = index * ITEM_HEIGHT;
     // Allow user scroll after the browser settles the snap.
-    window.setTimeout(() => { programmaticRef.current = false; }, 120);
+    allowUserScrollAfter(120);
+    return () => {
+      if (programmaticTimer.current) window.clearTimeout(programmaticTimer.current);
+      if (scrollTimer.current) window.clearTimeout(scrollTimer.current);
+    };
   }, [index]);
 
   const handleScroll = () => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || programmaticRef.current) return;
     // Debounce so we only commit when scrolling settles.
     if (scrollTimer.current) window.clearTimeout(scrollTimer.current);
     scrollTimer.current = window.setTimeout(() => {
@@ -85,15 +100,32 @@ function Wheel({
         if (Math.abs(el.scrollTop - target) > 1) {
           programmaticRef.current = true;
           el.scrollTop = target;
-          window.setTimeout(() => { programmaticRef.current = false; }, 80);
+          allowUserScrollAfter(80);
         }
       }
     }, 90);
   };
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    let nextIndex = index;
+    if (event.key === 'ArrowUp') nextIndex = Math.max(0, index - 1);
+    else if (event.key === 'ArrowDown') nextIndex = Math.min(items.length - 1, index + 1);
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = items.length - 1;
+    else return;
+
+    event.preventDefault();
+    if (nextIndex !== index) onIndexChange(nextIndex);
+  };
+
+  const selectedValue = Number(items[index]);
+  const firstValue = Number(items[0]);
+  const lastValue = Number(items[items.length - 1]);
+  const isNumericWheel = Number.isFinite(selectedValue);
+
   return (
     <div
-      className="relative scrollbar-hide overflow-y-scroll snap-y snap-mandatory"
+      className="relative z-[1] scrollbar-hide overflow-y-scroll snap-y snap-mandatory time-wheel-column"
       style={{
         width,
         height: ITEM_HEIGHT * (VISIBLE_RADIUS * 2 + 1),
@@ -105,18 +137,26 @@ function Wheel({
         WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, #000 32%, #000 68%, transparent 100%)',
       }}
       onScroll={handleScroll}
+      onKeyDown={handleKeyDown}
       ref={ref}
+      role="spinbutton"
+      aria-label={label}
+      aria-valuemin={isNumericWheel ? firstValue : 1}
+      aria-valuemax={isNumericWheel ? lastValue : items.length}
+      aria-valuenow={isNumericWheel ? selectedValue : index + 1}
+      aria-valuetext={`${label} ${format(items[index])}`}
+      tabIndex={0}
     >
       {items.map((item, i) => (
         <div
           key={item}
-          className="snap-center flex items-center justify-center tabular-nums select-none"
+          aria-hidden="true"
+          className={`snap-center flex items-center justify-center tabular-nums select-none time-wheel-value ${i === index ? 'is-selected' : ''}`}
           style={{
             height: ITEM_HEIGHT,
             fontSize: 24,
-            fontWeight: 500,
-            color: i === index ? '#FFFFFF' : 'rgba(235, 235, 245, 0.35)',
-            transition: 'color 0.15s ease',
+            fontWeight: i === index ? 650 : 500,
+            color: i === index ? 'var(--ging-ink)' : 'rgba(90, 65, 55, 0.44)',
           }}
         >
           {format(item)}
@@ -138,10 +178,10 @@ export default function TimeWheelPicker({ value, onChange }: TimeWheelPickerProp
   };
 
   return (
-    <div className="relative">
+    <div className="relative time-wheel-picker">
       {/* Center highlight band */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 rounded-2xl bg-white/[0.06] border-y border-white/[0.08]"
+        className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 time-wheel-selection"
         style={{ height: ITEM_HEIGHT }}
       />
       <div className="flex items-center justify-center relative">
@@ -149,6 +189,7 @@ export default function TimeWheelPicker({ value, onChange }: TimeWheelPickerProp
           items={HOURS_12}
           index={hourIdx < 0 ? 5 : hourIdx}
           onIndexChange={(i) => emit(i, minute, period)}
+          label="Hour"
           width="78px"
         />
         <span className="text-2xl text-white/30 font-medium px-1 -mx-1">:</span>
@@ -156,12 +197,14 @@ export default function TimeWheelPicker({ value, onChange }: TimeWheelPickerProp
           items={MINUTES}
           index={minuteIdx < 0 ? 0 : minuteIdx}
           onIndexChange={(i) => emit(hourIdx < 0 ? 5 : hourIdx, MINUTES[i], period)}
+          label="Minute"
           width="78px"
         />
         <Wheel
           items={PERIODS}
           index={periodIdx < 0 ? 0 : periodIdx}
           onIndexChange={(i) => emit(hourIdx < 0 ? 5 : hourIdx, minute, PERIODS[i] as 'AM' | 'PM')}
+          label="AM or PM"
           width="62px"
         />
       </div>
