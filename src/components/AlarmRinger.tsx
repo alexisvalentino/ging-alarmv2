@@ -367,7 +367,7 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
   }
 
   return (
-    <div className="relative min-h-dvh text-[#261813] select-none flex flex-col overflow-x-hidden font-sans ambient-glow-bg ging-screen ging-screen--ringing">
+    <div className="relative h-dvh min-h-dvh text-[#261813] select-none flex flex-col overflow-hidden font-sans ambient-glow-bg ging-screen ging-screen--ringing">
       {/* Hidden processing canvas used for frame analysis */}
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
@@ -378,7 +378,7 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
       {/* Header */}
       <div className="max-w-md w-full mx-auto flex items-center justify-between px-6 pt-5 pb-3 z-10 ringing-header">
         <div className="ringing-title">
-          <img src="/gingy-mascot-cutout.webp" alt="" aria-hidden="true" className="ringing-mascot" />
+          <img src="/gingy-face-cutout.webp" alt="" aria-hidden="true" className="ringing-mascot" />
           <span className="font-sans font-semibold text-[17px] text-[#261813] tracking-tight truncate">
             {alarm.label || 'Alarm'}
           </span>
@@ -392,65 +392,66 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
       </div>
 
       {/* Main */}
-      <div className="flex-1 max-w-md w-full mx-auto px-6 py-4 flex flex-col z-10 space-y-5 ringing-main">
-        {/* Camera viewport — always mounted so the stream is never disconnected */}
-        <div className="relative glass-card rounded-3xl overflow-hidden ringing-camera">
-          <div className="aspect-[4/5] relative bg-black ringing-camera-view">
-            {!isCameraActive && !errorText && scanStatus !== 'stopping' && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-500 gap-3 p-4 text-center z-10 camera-loading">
-                <RefreshCw className="w-8 h-8 animate-spin text-zinc-400" />
-                <span className="text-[13px] text-zinc-400 font-medium">Starting camera…</span>
-              </div>
-            )}
-
-            {errorText && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-red-300 gap-3 overflow-y-auto z-20 camera-error" role="alert">
-                <div className="w-12 h-12 rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center shrink-0">
-                  <Ban className="w-6 h-6 text-red-400" />
+      <div className="flex-1 min-h-0 max-w-md w-full mx-auto py-3 flex flex-col z-10 ringing-main">
+        <div className="ringing-camera-stack">
+          {/* Camera viewport — always mounted so the stream is never disconnected */}
+          <div className="relative overflow-hidden rounded-[28px] ringing-camera">
+            <div className="relative bg-black ringing-camera-view">
+              {!isCameraActive && !errorText && scanStatus !== 'stopping' && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-500 gap-3 p-4 text-center z-10 camera-loading">
+                  <RefreshCw className="w-8 h-8 animate-spin text-zinc-400" />
+                  <span className="text-[13px] text-zinc-400 font-medium">Starting camera…</span>
                 </div>
-                <span className="text-[13px] text-zinc-300 leading-relaxed font-medium">{errorText}</span>
+              )}
 
-                <button
-                  onClick={() => scanStatus === 'stop-error'
-                    ? void stopAlarmAfterSuccessfulScan()
-                    : void startCamera()}
-                  className="w-full max-w-xs text-[14px] glass-button font-medium py-3 rounded-xl transition-transform active:scale-95 mt-1"
-                >
-                  {scanStatus === 'stop-error' ? 'Retry stopping' : 'Retry camera'}
-                </button>
-              </div>
-            )}
+              {errorText && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-red-300 gap-3 overflow-y-auto z-20 camera-error" role="alert">
+                  <div className="w-12 h-12 rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center shrink-0">
+                    <Ban className="w-6 h-6 text-red-400" />
+                  </div>
+                  <span className="text-[13px] text-zinc-300 leading-relaxed font-medium">{errorText}</span>
 
-            {/* Always-mounted video stream */}
-            <video
-              ref={videoRef}
-              className="w-full h-full object-cover"
-              playsInline
-              muted
-            />
-
-            {scanStatus === 'stopping' && (
-              <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/25" role="status" aria-live="polite">
-                <div className="glass-card flex items-center gap-3 px-5 py-4 rounded-2xl">
-                  <RefreshCw className="w-5 h-5 animate-spin text-ging-orange" />
-                  <span className="text-[14px] font-medium">Stopping alarm…</span>
+                  <button
+                    onClick={() => scanStatus === 'stop-error'
+                      ? void stopAlarmAfterSuccessfulScan()
+                      : void startCamera()}
+                    className="w-full max-w-xs text-[14px] glass-button font-medium py-3 rounded-xl transition-transform active:scale-95 mt-1"
+                  >
+                    {scanStatus === 'stop-error' ? 'Retry stopping' : 'Retry camera'}
+                  </button>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Keep the live scan guide visible during brief wrong-code feedback. */}
-            {isCameraActive && (scanStatus === 'scanning' || scanStatus === 'wrong-code') && (
-              <div className={`scanner-overlay absolute inset-0 pointer-events-none flex items-center justify-center ${scanStatus === 'wrong-code' ? 'scanner-overlay--error' : ''}`}>
-                <div className="w-56 h-56 relative">
-                  <div className="scanner-line absolute inset-x-2 h-0.5 scan-line rounded-full" />
-                  <div className="scanner-corner absolute -top-px -left-px w-7 h-7 border-t-2 border-l-2 rounded-tl-xl" />
-                  <div className="scanner-corner absolute -top-px -right-px w-7 h-7 border-t-2 border-r-2 rounded-tr-xl" />
-                  <div className="scanner-corner absolute -bottom-px -left-px w-7 h-7 border-b-2 border-l-2 rounded-bl-xl" />
-                  <div className="scanner-corner absolute -bottom-px -right-px w-7 h-7 border-b-2 border-r-2 rounded-br-xl" />
+              {/* Always-mounted video stream */}
+              <video
+                ref={videoRef}
+                className="ringing-camera-video"
+                playsInline
+                muted
+              />
+
+              {scanStatus === 'stopping' && (
+                <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/25" role="status" aria-live="polite">
+                  <div className="glass-card flex items-center gap-3 px-5 py-4 rounded-2xl">
+                    <RefreshCw className="w-5 h-5 animate-spin text-ging-orange" />
+                    <span className="text-[14px] font-medium">Stopping alarm…</span>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
+              {/* Keep the live scan guide visible during brief wrong-code feedback. */}
+              {isCameraActive && (scanStatus === 'scanning' || scanStatus === 'wrong-code') && (
+                <div className={`scanner-overlay absolute inset-0 pointer-events-none flex items-center justify-center ${scanStatus === 'wrong-code' ? 'scanner-overlay--error' : ''}`}>
+                  <div className="scanner-frame relative">
+                    <div className="scanner-corner absolute -top-px -left-px w-8 h-8 border-t-2 border-l-2 rounded-tl-2xl" />
+                    <div className="scanner-corner absolute -top-px -right-px w-8 h-8 border-t-2 border-r-2 rounded-tr-2xl" />
+                    <div className="scanner-corner absolute -bottom-px -left-px w-8 h-8 border-b-2 border-l-2 rounded-bl-2xl" />
+                    <div className="scanner-corner absolute -bottom-px -right-px w-8 h-8 border-b-2 border-r-2 rounded-br-2xl" />
+                  </div>
+                </div>
+              )}
+
+            </div>
           </div>
 
           {/* Keep camera diagnostics out of the alarm UI; the task is simply to scan. */}
@@ -458,7 +459,7 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
             <div className={`scanner-camera-status ${scanStatus === 'wrong-code' ? 'scanner-camera-status--error' : ''}`} role="status" aria-live="polite">
               {scanStatus === 'wrong-code' ? (
                 <div className="scanner-error-feedback">
-                  <span className="scanner-error-icon" aria-hidden="true"><Ban className="w-4 h-4" /></span>
+                  <span className="scanner-error-icon" aria-hidden="true"><Ban className="w-5 h-5" /></span>
                   <span className="scanner-error-copy">
                     <strong>Wrong QR code</strong>
                     <span>Keep this alarm&apos;s code in view.</span>

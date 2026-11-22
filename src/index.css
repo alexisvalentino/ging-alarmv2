@@ -38,67 +38,62 @@
   --color-label-tertiary: #76594E;
 }
 
-/* --- Scanner motion and scrolling --------------------------------------- */
-.scan-line {
-  animation: scan 2.8s infinite ease-in-out;
-}
-
+/* --- Scanner feedback --------------------------------------------------- */
 .scanner-overlay {
-  color: var(--ging-primary);
+  color: rgba(255, 248, 246, 0.94);
 }
 
 .scanner-overlay--error {
-  color: var(--ging-error);
-}
-
-.scanner-line {
-  background: currentColor;
+  color: rgba(255, 248, 246, 0.94);
 }
 
 .scanner-corner {
   border-color: currentColor;
 }
 
-.scanner-overlay--error .scanner-corner {
-  animation: scanner-error-pulse 900ms ease-in-out 2;
+.scanner-frame {
+  width: min(46vw, 14rem);
+  aspect-ratio: 1;
 }
 
 .scanner-camera-status {
-  min-height: 52px;
-  padding: 8px 16px;
+  min-height: 36px;
+  padding: 4px 2px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  border-top: 1px solid rgba(164, 62, 0, 0.1);
+  justify-content: flex-start;
   color: var(--ging-primary);
   font-size: 0.875rem;
   line-height: 1.25rem;
 }
 
 .scanner-camera-status--error {
-  min-height: 64px;
-  background: linear-gradient(180deg, rgba(255, 250, 248, 0.72), rgba(255, 239, 236, 0.9));
+  min-height: 104px;
+  flex: none;
+  padding: 18px 20px;
+  border-radius: 24px;
+  background: linear-gradient(145deg, #fff3ef 0%, #ffe9e2 100%);
+  box-shadow: 0 10px 26px -18px rgba(96, 48, 29, 0.46);
 }
 
 .scanner-error-feedback {
   width: 100%;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
+  justify-content: flex-start;
+  gap: 16px;
   animation: scanner-feedback-in 180ms ease-out both;
 }
 
 .scanner-error-icon {
-  width: 30px;
-  height: 30px;
+  width: 48px;
+  height: 48px;
   flex: none;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(186, 26, 26, 0.16);
   border-radius: 50%;
   color: var(--ging-error);
-  background: rgba(255, 218, 214, 0.64);
+  background: rgba(186, 26, 26, 0.1);
 }
 
 .scanner-error-copy {
@@ -110,31 +105,21 @@
 }
 
 .scanner-error-copy strong {
-  font-size: 0.8125rem;
+  font-size: 1.125rem;
   font-weight: 650;
-  line-height: 1.125rem;
+  line-height: 1.4rem;
+  letter-spacing: -0.02em;
 }
 
 .scanner-error-copy span {
   color: var(--ging-muted);
-  font-size: 0.75rem;
-  line-height: 1rem;
-}
-
-@keyframes scanner-error-pulse {
-  0%, 100% { opacity: 0.66; }
-  50% { opacity: 1; }
+  font-size: 0.875rem;
+  line-height: 1.25rem;
 }
 
 @keyframes scanner-feedback-in {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes scan {
-  0% { top: 8%; opacity: 0.4; }
-  50% { top: 92%; opacity: 1; }
-  100% { top: 8%; opacity: 0.4; }
 }
 
 .soft-pulse {
@@ -1042,21 +1027,60 @@ body {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .ringing-mascot {
-  width: 40px;
-  height: 40px;
+  width: 52px;
+  height: 52px;
   flex: none;
-  object-fit: cover;
-  object-position: 50% 6%;
+  object-fit: contain;
+  object-position: center;
   border-radius: 50%;
-  filter: drop-shadow(0 3px 6px rgba(164, 62, 0, 0.22));
+  padding: 3px;
+  background: rgba(255, 255, 255, 0.82);
+  filter: drop-shadow(0 5px 10px rgba(96, 48, 29, 0.16));
+}
+
+.ringing-header {
+  flex: none;
+}
+
+.ringing-main {
+  width: 100%;
+}
+
+.ringing-camera-stack {
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ringing-camera {
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  background: #211a17;
+  box-shadow: 0 16px 34px -22px rgba(35, 20, 14, 0.48);
 }
 
 .ringing-camera-view {
-  aspect-ratio: 4 / 5;
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  background: #211a17;
+}
+
+.ringing-camera-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .repeat-picker button {
@@ -1125,10 +1149,6 @@ body {
 
   .ging-screen {
     padding-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right));
-  }
-
-  .ringing-camera-view {
-    aspect-ratio: 1 / 1;
   }
 }
 
@@ -1410,11 +1430,16 @@ body {
   .ringing-main {
     display: flex;
     flex-direction: column;
-    align-content: center;
+    align-content: stretch;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 0;
-    padding-block: 20px;
+    padding-block: 12px;
+  }
+
+  .ringing-camera-stack {
+    min-height: 0;
+    flex: 1;
   }
 
   .ringing-main > * {
@@ -1427,8 +1452,18 @@ body {
   }
 
   .ringing-camera-view {
-    aspect-ratio: 4 / 3;
-    max-height: min(68dvh, 620px);
+    aspect-ratio: auto;
+    max-height: none;
+  }
+
+  .scanner-camera-status--error {
+    min-height: 84px;
+    padding: 12px 16px;
+  }
+
+  .scanner-error-icon {
+    width: 42px;
+    height: 42px;
   }
 
   .ringing-mascot {
