@@ -5,24 +5,23 @@
 
 import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
+import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { Alarm, PermissionItem, AppState } from './types';
 import Splash from './components/Splash';
 import StartupScreen from './components/StartupScreen';
+import { generateWakeUpSecret } from './utils/qrSecret';
+import {
+  checkAlarmNotificationReadiness,
+  clearDeliveredAlarmNotifications,
+  syncAlarmNotifications
+} from './utils/nativeAlarmNotifications';
+import { NOTIFICATION_SOURCE } from './utils/alarmNotificationSchedule';
 
 const PermissionsSetup = lazy(() => import('./components/PermissionsSetup'));
 const QRCodeManager = lazy(() => import('./components/QRCodeManager'));
 const Dashboard = lazy(() => import('./components/Dashboard'));
 const AlarmRinger = lazy(() => import('./components/AlarmRinger'));
-
-// Helper to generate a random high-entropy human-readable wake up secret
-const generateRandomSecret = () => {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Avoid easily mistaken chars like I, O, 1, 0
-  let code = 'GING_';
-  for (let i = 0; i < 6; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return code;
-};
 
 const initialPermissions: PermissionItem[] = [
   {
@@ -74,12 +73,19 @@ const initialPermissions: PermissionItem[] = [
     id: 'p6',
     key: 'notification',
     title: 'Alarm notification',
-    description: 'Show alarm notifications.',
+    description: 'Let Ging alert you at each alarm time.',
     urgency: 'CRITICAL & MANDATORY',
     isSimulated: false,
     granted: false
   }
 ];
+
+const applyPlatformPermissionDefaults = (permissions: PermissionItem[]) => {
+  if (Capacitor.getPlatform() !== 'ios') return permissions;
+  return permissions.map(permission => ['overlay', 'battery', 'lockscreen'].includes(permission.key)
+    ? { ...permission, granted: true, isSimulated: true }
+    : permission);
+};
 
 export default function App() {
   const lastTriggeredMinuteRef = useRef<string>('');
@@ -92,13 +98,13 @@ export default function App() {
         const parsed = JSON.parse(cached);
         // Ensure properties exist
         const hasOnboarded = parsed.hasCompletedOnboarding || false;
-        const rawPermissions = parsed.permissions || initialPermissions;
+        const rawPermissions = applyPlatformPermissionDefaults(parsed.permissions || initialPermissions);
         const pendingAlarm: Alarm | null = hasOnboarded ? parsed.activeRingingAlarm || null : null;
 
         // Force reset to false if onboarding is not completed to ensure they are prompted
         const freshPermissions = hasOnboarded
           ? rawPermissions
-          : initialPermissions.map(p => ({ ...p, granted: false }));
+          : applyPlatformPermissionDefaults(initialPermissions.map(p => ({ ...p, granted: false })));
 
         return {
           currentView: pendingAlarm ? 'ringing' : hasOnboarded ? 'dashboard' : 'splash',
@@ -106,7 +112,7 @@ export default function App() {
           activeRingingAlarm: pendingAlarm,
           alarms: parsed.alarms || [],
           permissions: freshPermissions,
-          userQRSecret: parsed.userQRSecret || generateRandomSecret(),
+          userQRSecret: parsed.userQRSecret || generateWakeUpSecret(),
           streak: parsed.streak || 0,
           lastWakeUpTime: parsed.lastWakeUpTime || null
         };
@@ -116,7 +122,7 @@ export default function App() {
     }
 
     // Default pristine state
-    const defaultSecret = generateRandomSecret();
+    const defaultSecret = generateWakeUpSecret();
     const defaultAlarms: Alarm[] = [
       {
         id: 'default-morning',
@@ -135,13 +141,28 @@ export default function App() {
       hasCompletedOnboarding: false,
       activeRingingAlarm: null,
       alarms: defaultAlarms,
-      permissions: initialPermissions,
+      permissions: applyPlatformPermissionDefaults(initialPermissions),
       userQRSecret: defaultSecret,
       streak: 5, // give them a nice initial momentum streak to cherish!
       lastWakeUpTime: null
     };
   });
+  const stateRef = useRef(state);
+  stateRef.current = state;
   const [isStartupLoading, setIsStartupLoading] = useState(true);
+
+  const activateAlarm = useCallback((alarm: Alarm) => {
+    const alarmKey = `${new Date().getDay()}-${alarm.time}`;
+    if (lastTriggeredMinuteRef.current === alarmKey) return;
+    lastTriggeredMinuteRef.current = alarmKey;
+
+    setState(prev => {
+      if (prev.activeRingingAlarm || prev.currentView === 'ringing') return prev;
+      const currentAlarm = prev.alarms.find(candidate => candidate.id === alarm.id && candidate.active);
+      if (!currentAlarm) return prev;
+      return { ...prev, activeRingingAlarm: currentAlarm, currentView: 'ringing' };
+    });
+  }, []);
 
   useEffect(() => {
     if (state.currentView === 'ringing' && state.activeRingingAlarm) {
@@ -165,6 +186,119 @@ export default function App() {
       activeRingingAlarm: state.activeRingingAlarm
     }));
   }, [state]);
+
+  // Re-check OS notification access on launch and when returning from Settings.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    let disposed = false;
+    const refreshAlarmNotificationPermission = async () => {
+      try {
+        const readiness = await checkAlarmNotificationReadiness();
+        if (disposed) return;
+
+        setState(prev => {
+          const currentPermission = prev.permissions.find(permission => permission.key === 'notification');
+          const needsPermissionScreen = prev.hasCompletedOnboarding
+            && !readiness.ready
+            && prev.currentView !== 'ringing';
+          if (currentPermission?.granted === readiness.ready
+            && (!needsPermissionScreen || prev.currentView === 'permissions')) return prev;
+
+          return {
+            ...prev,
+            currentView: needsPermissionScreen ? 'permissions' : prev.currentView,
+            permissions: prev.permissions.map(permission => permission.key === 'notification'
+              ? { ...permission, granted: readiness.ready }
+              : permission)
+          };
+        });
+      } catch (error) {
+        console.error('Could not check native alarm notification access:', error);
+      }
+    };
+
+    void refreshAlarmNotificationPermission();
+    window.addEventListener('focus', refreshAlarmNotificationPermission);
+    document.addEventListener('visibilitychange', refreshAlarmNotificationPermission);
+
+    return () => {
+      disposed = true;
+      window.removeEventListener('focus', refreshAlarmNotificationPermission);
+      document.removeEventListener('visibilitychange', refreshAlarmNotificationPermission);
+    };
+  }, []);
+
+  // Native notifications remain scheduled by the OS when the app is backgrounded.
+  const alarmNotificationsReady = state.permissions.find(permission => permission.key === 'notification')?.granted ?? false;
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || !state.hasCompletedOnboarding) return;
+
+    let disposed = false;
+    void syncAlarmNotifications(alarmNotificationsReady ? state.alarms : []).catch(error => {
+      if (disposed) return;
+      console.error('Could not sync native wake-up alerts:', error);
+      setState(prev => ({
+        ...prev,
+        permissions: prev.permissions.map(permission => permission.key === 'notification'
+          ? { ...permission, granted: false }
+          : permission),
+        currentView: prev.currentView === 'ringing' ? 'ringing' : 'permissions'
+      }));
+    });
+
+    return () => { disposed = true; };
+  }, [alarmNotificationsReady, state.alarms, state.hasCompletedOnboarding]);
+
+  // A scheduled native alert opens the exact alarm flow and still requires the QR scan.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    let disposed = false;
+    const handles: Array<{ remove: () => Promise<void> }> = [];
+    const openAlarmFromNotification = async (notification: { extra?: unknown; id: number }) => {
+      const extra = notification.extra as { source?: string; alarmId?: string } | undefined;
+      if (extra?.source !== NOTIFICATION_SOURCE || !extra.alarmId) return;
+
+      const alarm = stateRef.current.alarms.find(candidate => candidate.id === extra.alarmId && candidate.active);
+      if (!alarm) return;
+
+      activateAlarm(alarm);
+      try {
+        await LocalNotifications.removeDeliveredNotificationsById({ ids: [notification.id] });
+      } catch (error) {
+        console.warn('Could not clear the opened wake-up alert:', error);
+      }
+    };
+
+    const registerListeners = async () => {
+      const received = await LocalNotifications.addListener('localNotificationReceived', openAlarmFromNotification);
+      const opened = await LocalNotifications.addListener('localNotificationActionPerformed', ({ notification }) => {
+        void openAlarmFromNotification(notification);
+      });
+      if (disposed) {
+        await received.remove();
+        await opened.remove();
+      } else {
+        handles.push(received, opened);
+      }
+
+      const delivered = await LocalNotifications.getDeliveredNotifications();
+      for (const notification of delivered.notifications) {
+        if (notification.extra?.source === NOTIFICATION_SOURCE) {
+          await openAlarmFromNotification(notification);
+          break;
+        }
+      }
+    };
+
+    void registerListeners().catch(error => console.error('Could not register native alarm listeners:', error));
+
+    return () => {
+      disposed = true;
+      for (const handle of handles) void handle.remove();
+    };
+  }, [activateAlarm]);
 
   useEffect(() => {
     const handleNativeBack = (event: Event) => {
@@ -214,21 +348,14 @@ export default function App() {
         );
       });
 
-      if (triggeredAlarm) {
-        lastTriggeredMinuteRef.current = currentAlarmKey;
-        setState(prev => ({
-          ...prev,
-          activeRingingAlarm: triggeredAlarm,
-          currentView: 'ringing'
-        }));
-      }
+      if (triggeredAlarm) activateAlarm(triggeredAlarm);
     };
 
     // Evaluate once on mount and check periodically
     checkAlarms();
     const interval = setInterval(checkAlarms, 12000);
     return () => clearInterval(interval);
-  }, [state.alarms, state.activeRingingAlarm, state.currentView]);
+  }, [activateAlarm, state.alarms, state.activeRingingAlarm, state.currentView]);
 
   // Onboarding workflow navigation triggers
   const handleCompleteSplash = () => {
@@ -250,7 +377,7 @@ export default function App() {
 
   const handleCompletePermissions = () => {
     qrReturnViewRef.current = 'permissions';
-    setState(prev => ({ ...prev, currentView: 'setup-qr' }));
+    setState(prev => ({ ...prev, currentView: prev.hasCompletedOnboarding ? 'dashboard' : 'setup-qr' }));
   };
 
   const handleCompleteQRSetup = () => {
@@ -262,7 +389,7 @@ export default function App() {
   };
 
   const handleRegenerateSecret = () => {
-    const newSecret = generateRandomSecret();
+    const newSecret = generateWakeUpSecret();
     setState(prev => ({
       ...prev,
       userQRSecret: newSecret,
@@ -311,6 +438,9 @@ export default function App() {
         streak: streakUpdated,
         lastWakeUpTime: todayStr
       };
+    });
+    void clearDeliveredAlarmNotifications().catch(error => {
+      console.warn('Could not clear delivered wake-up alerts:', error);
     });
   };
 

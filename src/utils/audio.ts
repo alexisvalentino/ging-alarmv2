@@ -14,7 +14,7 @@ class GingAudioEngine {
 
   private initContext() {
     if (!this.audioCtx) {
-      // @ts-ignore - support older legacy browsers just in case
+      // @ts-ignore - support older Web Audio implementations
       const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
       this.audioCtx = new AudioCtxClass();
     }

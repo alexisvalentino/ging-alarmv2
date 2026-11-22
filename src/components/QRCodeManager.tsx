@@ -86,7 +86,7 @@ export default function QRCodeManager({ userQRSecret, onRegenerateSecret, onComp
       const dataUrl = canvasRef.current.toDataURL('image/png');
       const base64Part = dataUrl.split(',')[1];
 
-      if (Capacitor.isNativePlatform()) {
+      if (Capacitor.getPlatform() === 'android') {
         try {
           await GingAndroid.saveBase64File({
             base64Data: base64Part,
@@ -185,7 +185,7 @@ export default function QRCodeManager({ userQRSecret, onRegenerateSecret, onComp
       doc.text('Place away from your bed. Scan to stop the alarm.', 105, 264, { align: 'center' });
 
       // Native Mobile: Save directly to device storage
-      if (Capacitor.isNativePlatform()) {
+      if (Capacitor.getPlatform() === 'android') {
         try {
           const pdfBase64 = doc.output('datauristring').split(',')[1];
           await GingAndroid.saveBase64File({

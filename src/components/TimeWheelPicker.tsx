@@ -76,7 +76,7 @@ function Wheel({
     if (!el) return;
     programmaticRef.current = true;
     el.scrollTop = index * ITEM_HEIGHT;
-    // Allow user scroll after the browser settles the snap.
+    // Allow user scroll after the initial layout settles.
     allowUserScrollAfter(120);
     return () => {
       if (programmaticTimer.current) window.clearTimeout(programmaticTimer.current);

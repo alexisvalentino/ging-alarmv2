@@ -25,21 +25,26 @@ Ging is a QR-code alarm app. To dismiss a ringing alarm, the user scans their ow
 - Generate a personal wake-up QR code and save it as an image or printable PDF.
 - Scan and validate the code locally with the device camera; only an exact match to the saved code dismisses the alarm.
 - Play alarm sounds with the Web Audio API.
-- Present a guided setup flow for camera, audio, notifications, and Android device settings.
-- Use a warm, mascot-led interface with a branded startup screen, app icons, and browser favicon assets.
+- Schedule native local alerts for active alarms and repeat days.
+- Present a guided setup flow for camera, audio, notifications, and platform-specific settings.
+- Use a warm, mascot-led interface with a branded startup screen and platform app icons.
 
 ### Android alarm behavior
 
-The Android integration is intentionally strict while an alarm is ringing. The native plugin sets the media stream to its maximum level when ringing begins and reapplies it every 2.5 seconds. The activity also handles the back button, requests screen-on/lock-screen window flags, holds a CPU wake lock, and attempts to bring the alarm activity back to the foreground if it is paused. The ringing screen does not provide a snooze or manual dismiss action; successful QR validation is the dismissal path.
+On Android, an exact native alert is scheduled for each enabled alarm day. Tapping it opens Ging's ringing screen. While that screen is active, Ging raises media volume to maximum, reapplies it every 2.5 seconds, blocks the hardware Back action, keeps the display awake, and attempts to return to the ringing screen if it is sent to the background. The screen has no snooze or manual dismiss action; a matching QR scan is the only in-app dismissal path. Android may still allow system-level actions such as force-stopping or powering off the device.
 
-These behaviors are implemented across `src/components/AlarmRinger.tsx`, `src/native/GingAndroid.ts`, `android/app/src/main/java/com/ging/alarm/GingAndroidPlugin.java`, and `MainActivity.java`.
+On iOS, Ging schedules native local alerts. Tapping an alert opens the app, where scanning the matching QR code dismisses the in-app ringer. iOS does not allow third-party apps to continuously override system volume or prevent system-level dismissal while backgrounded, so iOS alert delivery cannot enforce the Android ringing behavior.
+
+Exact Android alerts require notification permission and the system's **Alarms & reminders** access. If either is disabled, Ging returns to setup and does not claim the alarm is scheduled. Notification alerts depend on the operating system's notification and sound settings.
+
+These behaviors are implemented across `src/components/AlarmRinger.tsx`, `src/native/GingAndroid.ts`, `src/utils/nativeAlarmNotifications.ts`, `android/app/src/main/java/com/ging/alarm/GingAndroidPlugin.java`, and `MainActivity.java`.
 
 ## Tech stack
 
 - React 19 and TypeScript
 - Vite 6 and Tailwind CSS 4
 - Motion for transitions and animation
-- Capacitor 8 for the Android app shell and native bridge
+- Capacitor 8 for the Android and iOS app shells and native bridge
 - `jsQR` for QR decoding; `qrcode` and `jsPDF` for wake-up code exports
 - Web Audio API for alarm sound generation
 
@@ -49,6 +54,7 @@ These behaviors are implemented across `src/components/AlarmRinger.tsx`, `src/na
 
 - Node.js 18 or newer and npm
 - For Android builds: Android Studio/SDK and JDK 21
+- For iOS builds: macOS and Xcode
 
 ### Web app
 
@@ -86,11 +92,25 @@ cd android
 
 The APK is written to `android/app/build/outputs/apk/debug/`. A release build can be created with `assembleRelease`; configure your own signing credentials locally before distributing it. Signing files and local Android configuration are ignored by Git.
 
+### iOS
+
+On macOS with Xcode installed, build and sync the native project:
+
+```bash
+npm install
+npm run build
+npx cap sync ios
+npx cap open ios
+```
+
+Configure signing in Xcode before installing on a device or distributing a build.
+
 ## Project layout
 
 ```text
 assets/                 Source branding and dashboard preview
 android/                Capacitor Android project and native alarm integration
+ios/                    Capacitor iOS project and local notification integration
 public/                 Web icons, manifest, and mascot artwork
 src/App.tsx              App state, persistence, navigation, and alarm scheduling
 src/components/          Onboarding, alarm list, QR setup, picker, and ringing screens
@@ -113,8 +133,9 @@ The onboarding screen tracks six setup items. Some are app checks (such as an au
 | `npm run build` | Build the web app into `dist/` |
 | `npm run preview` | Preview the production build |
 | `npm run lint` | Run the TypeScript compiler without emitting files |
-| `npx cap sync android` | Sync web assets and native plugins into Android |
+| `npx cap sync android` | Sync app assets and native plugins into Android |
+| `npx cap sync ios` | Sync app assets and native plugins into iOS |
 
 ## Platform assets
 
-The repository includes web favicon/PWA assets, Android launcher and splash assets, and an iOS app icon source under `assets/ios/`. The configured native project in this repository is Android; the iOS image set is a branding asset, not a configured iOS build target.
+The repository includes a web app icon, Android launcher and splash assets, and a configured iOS app icon set. Both native platform projects are included; building iOS requires macOS and Xcode.

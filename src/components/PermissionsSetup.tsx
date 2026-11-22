@@ -13,6 +13,7 @@ import { PermissionItem } from '../types';
 import GingLogo from './GingLogo';
 import { Capacitor } from '@capacitor/core';
 import { GingAndroid } from '../native/GingAndroid';
+import { checkAlarmNotificationReadiness, requestAlarmNotificationReadiness } from '../utils/nativeAlarmNotifications';
 
 interface PermissionsSetupProps {
   permissions: PermissionItem[];
@@ -28,14 +29,27 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
   useEffect(() => {
     const checkNativePermissions = async () => {
       if (Capacitor.isNativePlatform()) {
-        try {
-          const { granted: overlayGranted } = await GingAndroid.checkOverlayPermission();
-          onUpdatePermission('overlay', overlayGranted);
+        if (Capacitor.getPlatform() === 'android') {
+          try {
+            const { granted: overlayGranted } = await GingAndroid.checkOverlayPermission();
+            onUpdatePermission('overlay', overlayGranted);
 
-          const { granted: batteryGranted } = await GingAndroid.checkBatteryBypass();
-          onUpdatePermission('battery', batteryGranted);
+            const { granted: batteryGranted } = await GingAndroid.checkBatteryBypass();
+            onUpdatePermission('battery', batteryGranted);
+          } catch (e) {
+            console.error("Failed re-checking Android alarm access on resume:", e);
+          }
+        } else {
+          onUpdatePermission('overlay', true);
+          onUpdatePermission('battery', true);
+          onUpdatePermission('lockscreen', true);
+        }
+
+        try {
+          const notificationReadiness = await checkAlarmNotificationReadiness();
+          onUpdatePermission('notification', notificationReadiness.ready);
         } catch (e) {
-          console.error("Failed re-checking native permissions on resume:", e);
+          console.error('Failed re-checking alarm notification access:', e);
         }
       }
     };
@@ -108,7 +122,7 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
         setSetupError('Ging could not play the audio check. Check your sound settings and try again.');
       }
     } else if (key === 'overlay') {
-      if (Capacitor.isNativePlatform()) {
+      if (Capacitor.getPlatform() === 'android') {
         try {
           // Open overlay manage page. Focus listener will pick up the result when they return.
           await GingAndroid.requestOverlayPermission();
@@ -120,7 +134,7 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
         onUpdatePermission('overlay', true);
       }
     } else if (key === 'battery') {
-      if (Capacitor.isNativePlatform()) {
+      if (Capacitor.getPlatform() === 'android') {
         try {
           // Open battery optimization bypass prompt. Focus listener will pick up the result when they return.
           await GingAndroid.requestBatteryBypass();
@@ -133,26 +147,36 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
       }
     } else if (key === 'notification') {
       try {
-        if ('Notification' in window) {
-          const res = await Notification.requestPermission();
-          onUpdatePermission('notification', res === 'granted');
-          if (res !== 'granted') setSetupError('Allow Ging notifications in your device settings to finish setup.');
-        } else {
+        setSetupError(null);
+        if (!Capacitor.isNativePlatform()) {
           onUpdatePermission('notification', false);
-          setSetupError('Notifications are not available in this browser. Use the Ging app to finish setup.');
+          setSetupError('Install Ging on your phone to enable alarm notifications.');
+          return;
+        }
+
+        const readiness = await requestAlarmNotificationReadiness();
+        onUpdatePermission('notification', readiness.ready);
+
+        if (!readiness.displayGranted) {
+          setSetupError('Turn on notifications for Ging in your device settings, then return here.');
+        } else if (!readiness.exactAlarmGranted) {
+          setSetupError('Allow “Alarms & reminders” for Ging so wake-up alerts arrive at the selected time.');
         }
       } catch (e) {
         console.warn("Notification request failed:", e);
         onUpdatePermission('notification', false);
-        setSetupError('Ging could not request notifications. Check your device settings and try again.');
+        setSetupError('Ging could not enable alarm alerts. Check your device settings and try again.');
       }
     } else {
       onUpdatePermission(key, true);
     }
   };
 
-  const allReady = permissions.every(p => p.granted);
-  const grantedCount = permissions.filter(p => p.granted).length;
+  const visiblePermissions = Capacitor.getPlatform() === 'ios'
+    ? permissions.filter(permission => !['overlay', 'battery', 'lockscreen'].includes(permission.key))
+    : permissions;
+  const allReady = visiblePermissions.every(permission => permission.granted);
+  const grantedCount = visiblePermissions.filter(permission => permission.granted).length;
 
   return (
     <div className="relative min-h-dvh ambient-glow-bg ging-screen ging-screen--permissions text-white flex flex-col justify-between p-6 overflow-x-hidden font-sans">
@@ -166,7 +190,7 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
           <GingLogo size={32} />
         </div>
         <span className="glass-badge rounded-full px-3 py-1.5 text-[13px] font-medium tabular-nums" role="status" aria-live="polite">
-          {grantedCount} of {permissions.length} ready
+          {grantedCount} of {visiblePermissions.length} ready
         </span>
       </div>
 
@@ -182,7 +206,7 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
 
         {/* Permissions grouped list (iOS Settings look) */}
         <div className="glass-card divide-y divide-white/[0.06] overflow-hidden permissions-rows">
-          {permissions.map((p) => {
+          {visiblePermissions.map((p) => {
             const Icon = {
               camera: Camera,
               audio: Music,
@@ -267,7 +291,11 @@ export default function PermissionsSetup({ permissions, onUpdatePermission, onCo
                             )}
                             {p.key === 'battery' && "Android may pause background apps to save power. This access helps Ging keep its timer active."}
                             {p.key === 'lockscreen' && "This wakes the display without unlocking your phone."}
-                            {p.key === 'notification' && "Android may show an ongoing Ging notification while alarms are scheduled."}
+                            {p.key === 'notification' && (!Capacitor.isNativePlatform()
+                              ? 'Install Ging on your phone to schedule native wake-up alerts.'
+                              : Capacitor.getPlatform() === 'android'
+                                ? 'Ging schedules native wake-up alerts and needs Alarms & reminders access for precise timing.'
+                                : 'Ging schedules a system alert for each enabled alarm. Tap the alert to open Ging and scan your wake-up code.')}
                           </div>
                         </div>
                       </div>

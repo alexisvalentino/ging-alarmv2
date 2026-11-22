@@ -58,7 +58,7 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
     let volumeGuardInterval: number | null = null;
 
     // Lock the native Android back-buttons and system-exits during alarm ringing
-    if (Capacitor.isNativePlatform()) {
+    if (Capacitor.getPlatform() === 'android') {
       GingAndroid.setAlarmActive({ active: true }).catch(err => console.error(err));
       GingAndroid.forceMaxVolume().catch(err => console.error(err));
 
@@ -85,7 +85,7 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
       stopCamera();
 
       // Release native lock when alarm is successfully dismissed
-      if (Capacitor.isNativePlatform()) {
+      if (Capacitor.getPlatform() === 'android') {
         GingAndroid.setAlarmActive({ active: false }).catch(err => console.error(err));
       }
     };
@@ -144,7 +144,7 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
       endedTrackRef.current = { track: videoTrack, listener: onTrackEnded };
 
       video.srcObject = acquiredStream;
-      video.setAttribute('playsinline', 'true'); // helpful for mobile browsers
+      video.setAttribute('playsinline', 'true'); // required by mobile WebViews
       await video.play();
       if (!isCurrentRequest() || mediaStreamRef.current !== acquiredStream) return;
       setIsCameraActive(true);
