@@ -74,6 +74,7 @@ export default function Dashboard({
 }: DashboardProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [editingAlarmId, setEditingAlarmId] = useState<string | null>(null);
   const [newTime, setNewTime] = useState('06:00');
   const [newLabel, setNewLabel] = useState('');
   const [newDays, setNewDays] = useState<number[]>([1, 2, 3, 4, 5]); // weekdays by default
@@ -83,6 +84,35 @@ export default function Dashboard({
   const addAlarmButtonRef = useRef<HTMLButtonElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const alarmLongPressTimerRef = useRef<number | null>(null);
+  const alarmPointerStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const clearAlarmLongPress = () => {
+    if (alarmLongPressTimerRef.current !== null) {
+      window.clearTimeout(alarmLongPressTimerRef.current);
+      alarmLongPressTimerRef.current = null;
+    }
+    alarmPointerStartRef.current = null;
+  };
+
+  const beginAlarmLongPress = (event: React.PointerEvent<HTMLDivElement>, alarmId: string) => {
+    if (editing || !event.isPrimary || event.button !== 0) return;
+    if ((event.target as HTMLElement).closest('button')) return;
+
+    clearAlarmLongPress();
+    alarmPointerStartRef.current = { x: event.clientX, y: event.clientY };
+    alarmLongPressTimerRef.current = window.setTimeout(() => {
+      setEditingAlarmId(alarmId);
+      alarmLongPressTimerRef.current = null;
+      alarmPointerStartRef.current = null;
+    }, 900);
+  };
+
+  const moveAlarmLongPress = (event: React.PointerEvent<HTMLDivElement>) => {
+    const start = alarmPointerStartRef.current;
+    if (!start) return;
+    if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10) clearAlarmLongPress();
+  };
 
   // Sound preview handler — plays 1.5s sample then auto-stops
   const handlePreviewSound = useCallback((soundKey: string) => {
@@ -164,6 +194,7 @@ export default function Dashboard({
 
   React.useEffect(() => () => {
     if (previewTimerRef.current) window.clearTimeout(previewTimerRef.current);
+    if (alarmLongPressTimerRef.current !== null) window.clearTimeout(alarmLongPressTimerRef.current);
     gingAudio.stop();
   }, []);
 
@@ -201,11 +232,15 @@ export default function Dashboard({
       <div className="relative z-20 max-w-md w-full mx-auto px-6 dashboard-header">
         <div className="dashboard-toolbar">
           <button
-            onClick={() => setEditing(e => !e)}
+            onClick={() => {
+              const isManaging = editing || editingAlarmId !== null;
+              setEditing(!isManaging);
+              setEditingAlarmId(null);
+            }}
             className="w-16 min-h-[44px] text-left text-[15px] font-medium text-ging-burnt"
-            aria-pressed={editing}
+            aria-pressed={editing || editingAlarmId !== null}
           >
-            {editing ? 'Done' : 'Manage'}
+            {editing || editingAlarmId !== null ? 'Done' : 'Manage'}
           </button>
           <button
             onClick={() => setShowAddForm(true)}
@@ -245,6 +280,7 @@ export default function Dashboard({
                 const alarmLabel = alarm.id === 'default-morning' && alarm.label === 'Bathroom Mirror Session'
                   ? 'Morning alarm'
                   : alarm.label;
+                const rowEditing = editing || editingAlarmId === alarm.id;
                 return (
                   <motion.div
                     key={alarm.id}
@@ -254,24 +290,34 @@ export default function Dashboard({
                     exit={{ opacity: 0, scale: 0.985, transition: { duration: 0.12 } }}
                     transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
                     className={`flex items-center gap-3 px-4 py-4 dashboard-alarm-row ${alarm.active ? '' : 'opacity-55'}`}
+                    onPointerDown={event => beginAlarmLongPress(event, alarm.id)}
+                    onPointerMove={moveAlarmLongPress}
+                    onPointerUp={clearAlarmLongPress}
+                    onPointerCancel={clearAlarmLongPress}
+                    onPointerLeave={clearAlarmLongPress}
+                    onContextMenu={event => event.preventDefault()}
                   >
                     {/* Collapse the delete slot after its control exits so the row reclaims the space. */}
                     <motion.div
                       initial={false}
-                      animate={{ width: editing ? 48 : 0, opacity: editing ? 1 : 0, marginRight: editing ? 0 : -12 }}
+                      animate={{ width: rowEditing ? 48 : 0, opacity: rowEditing ? 1 : 0, marginRight: rowEditing ? 0 : -12 }}
                       transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
                       className="shrink-0 h-12 flex items-center justify-center overflow-hidden"
-                      aria-hidden={!editing}
+                      aria-hidden={!rowEditing}
                     >
                       <AnimatePresence initial={false}>
-                        {editing && (
+                        {rowEditing && (
                           <motion.button
                             key="delete"
                             initial={{ opacity: 0, scale: 0.82 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.82 }}
                             transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}
-                            onClick={() => onDeleteAlarm(alarm.id)}
+                            disabled={!rowEditing}
+                            onClick={() => {
+                              onDeleteAlarm(alarm.id);
+                              if (editingAlarmId === alarm.id) setEditingAlarmId(null);
+                            }}
                             className="shrink-0 w-12 h-12 rounded-full border border-ging-red/60 flex items-center justify-center text-ging-red"
                             aria-label={`Delete ${alarmLabel}`}
                           >

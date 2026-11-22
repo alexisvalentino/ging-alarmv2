@@ -302,6 +302,8 @@ export default function App() {
 
   useEffect(() => {
     const handleNativeBack = (event: Event) => {
+      if (event.defaultPrevented) return;
+
       if (state.currentView === 'ringing') {
         event.preventDefault();
         return;
@@ -481,6 +483,7 @@ export default function App() {
                   {state.currentView === 'setup-qr' && (
                     <QRCodeManager
                       userQRSecret={state.userQRSecret}
+                      hasAlarms={state.alarms.length > 0}
                       onRegenerateSecret={handleRegenerateSecret}
                       onComplete={handleCompleteQRSetup}
                     />

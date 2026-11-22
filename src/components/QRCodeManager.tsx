@@ -36,16 +36,21 @@ const loadPngDataUrl = (src: string) => new Promise<{ dataUrl: string; width: nu
 
 interface QRCodeManagerProps {
   userQRSecret: string;
+  hasAlarms: boolean;
   onRegenerateSecret: () => void;
   onComplete: () => void;
 }
 
-export default function QRCodeManager({ userQRSecret, onRegenerateSecret, onComplete }: QRCodeManagerProps) {
+export default function QRCodeManager({ userQRSecret, hasAlarms, onRegenerateSecret, onComplete }: QRCodeManagerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const regenerateButtonRef = useRef<HTMLButtonElement>(null);
+  const cancelRegenerateRef = useRef<HTMLButtonElement>(null);
+  const regenerateDialogRef = useRef<HTMLDivElement>(null);
   const feedbackTimerRef = useRef<number | null>(null);
   const [feedback, setFeedback] = useState<{ message: string; isError: boolean } | null>(null);
   const [qrError, setQrError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
 
   // Generate QR code and paint on Canvas
   useEffect(() => {
@@ -78,6 +83,51 @@ export default function QRCodeManager({ userQRSecret, onRegenerateSecret, onComp
   useEffect(() => () => {
     if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
   }, []);
+
+  useEffect(() => {
+    if (!showRegenerateConfirm) return;
+
+    cancelRegenerateRef.current?.focus();
+
+    const closeConfirmation = () => setShowRegenerateConfirm(false);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeConfirmation();
+        return;
+      }
+
+      if (event.key !== 'Tab' || !regenerateDialogRef.current) return;
+      const controls = Array.from(regenerateDialogRef.current.querySelectorAll(
+        'button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      ) as NodeListOf<HTMLElement>);
+      if (controls.length === 0) return;
+
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      const focusIsInside = regenerateDialogRef.current.contains(document.activeElement);
+      if (event.shiftKey && (document.activeElement === first || !focusIsInside)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !focusIsInside)) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    const handleNativeBack = (event: Event) => {
+      event.preventDefault();
+      closeConfirmation();
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    // Capture first so the app-level back handler knows this dialog consumed the action.
+    window.addEventListener('ging:back', handleNativeBack, true);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('ging:back', handleNativeBack, true);
+      regenerateButtonRef.current?.focus();
+    };
+  }, [showRegenerateConfirm]);
 
   // Download QR Code as a high-res PNG image
   const downloadPNG = async () => {
@@ -281,7 +331,8 @@ export default function QRCodeManager({ userQRSecret, onRegenerateSecret, onComp
         {/* Actions grouped list */}
         <div className="glass-card rounded-2xl w-full divide-y divide-white/[0.06] overflow-hidden qr-actions">
           <button
-            onClick={onRegenerateSecret}
+            ref={regenerateButtonRef}
+            onClick={() => setShowRegenerateConfirm(true)}
             disabled={isGenerating}
             className="w-full flex items-center gap-3 px-4 py-3.5 cursor-pointer transition-colors active:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50 qr-action"
           >
@@ -333,6 +384,64 @@ export default function QRCodeManager({ userQRSecret, onRegenerateSecret, onComp
           )}
         </AnimatePresence>
       </div>
+
+      <AnimatePresence>
+        {showRegenerateConfirm && (
+          <motion.div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-[#24110c]/45 px-5 py-8 backdrop-blur-[4px]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.16 }}
+            onClick={event => {
+              if (event.target === event.currentTarget) setShowRegenerateConfirm(false);
+            }}
+          >
+            <motion.div
+              ref={regenerateDialogRef}
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="regenerate-code-title"
+              aria-describedby="regenerate-code-description"
+              className="glass-card-light w-full max-w-sm rounded-[28px] p-6 shadow-2xl"
+              initial={{ opacity: 0, y: 10, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 6, scale: 0.98 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+              onClick={event => event.stopPropagation()}
+            >
+              <h2 id="regenerate-code-title" className="text-[21px] leading-tight font-semibold text-[#261711]">
+                Replace wake-up code?
+              </h2>
+              <p id="regenerate-code-description" className="mt-3 text-[15px] leading-relaxed text-[#674d42]">
+                {hasAlarms
+                  ? 'Your current printed code will stop working, and every alarm will switch to the new code. Print and place the replacement before your next alarm.'
+                  : 'Your current printed code will stop working. Save or print the replacement before relying on it.'}
+              </p>
+              <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  ref={cancelRegenerateRef}
+                  type="button"
+                  onClick={() => setShowRegenerateConfirm(false)}
+                  className="min-h-12 rounded-full px-5 text-[15px] font-medium text-[#674d42] transition-colors active:bg-[#6c3a22]/[0.08] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ging-orange"
+                >
+                  Keep current code
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRegenerateConfirm(false);
+                    onRegenerateSecret();
+                  }}
+                  className="min-h-12 rounded-full bg-ging-burnt px-5 text-[15px] font-semibold text-white transition-colors active:bg-ging-burnt/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ging-orange"
+                >
+                  Replace code
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Continue CTA */}
       <div className="max-w-md w-full mx-auto mt-6 z-10 qr-footer">
