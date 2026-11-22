@@ -120,7 +120,7 @@ public final class AlarmScheduler {
             entry.put("id", id);
             entry.put("time", time);
             entry.put("days", days);
-            entry.put("soundType", alarm.optString("soundType", "industrial"));
+            entry.put("soundType", AlarmSounds.normalize(alarm.optString("soundType", AlarmSounds.INDUSTRIAL)));
             normalized.put(entry);
         }
 
@@ -172,7 +172,7 @@ public final class AlarmScheduler {
             .putExtra(EXTRA_ALARM_ID, id)
             .putExtra(EXTRA_ALARM_DAY, dayIndex)
             .putExtra(EXTRA_ALARM_TIME, time)
-            .putExtra(EXTRA_SOUND_TYPE, alarm.optString("soundType", "industrial"));
+            .putExtra(EXTRA_SOUND_TYPE, AlarmSounds.normalize(alarm.optString("soundType", AlarmSounds.INDUSTRIAL)));
         PendingIntent fireOperation = PendingIntent.getBroadcast(
             context,
             0,

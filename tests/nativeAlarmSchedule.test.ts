@@ -38,3 +38,14 @@ test('passes only active alarms and their selected sounds to Android AlarmManage
   }]);
   assert.notEqual(schedules[0].days, alarms[0].days);
 });
+
+test('preserves each of the three selected sounds in native schedules', () => {
+  const selectedSounds: Alarm['soundType'][] = ['industrial', 'classic-beep', 'air-horn'];
+  const schedules = buildNativeAlarmSchedules(selectedSounds.map((soundType, index) => ({
+    ...alarms[0],
+    id: `sound-${index}`,
+    soundType
+  })));
+
+  assert.deepEqual(schedules.map(schedule => schedule.soundType), selectedSounds);
+});

@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { isAlarmSoundType } from '../constants/alarmSounds';
+import type { AlarmSoundType } from '../constants/alarmSounds';
+
 class GingAudioEngine {
   private audioCtx: AudioContext | null = null;
   private oscillator1: OscillatorNode | null = null;
@@ -23,7 +26,8 @@ class GingAudioEngine {
     }
   }
 
-  public start(soundType: string, volume: number = 0.8) {
+  public start(soundType: AlarmSoundType, volume: number = 0.8) {
+    if (!isAlarmSoundType(soundType)) return;
     if (this.isPlaying) return;
     this.isPlaying = true;
     this.initContext();
@@ -35,14 +39,16 @@ class GingAudioEngine {
     this.gainNode.gain.setValueAtTime(volume, this.audioCtx.currentTime);
     this.gainNode.connect(this.audioCtx.destination);
 
-    if (soundType === 'industrial') {
-      this.startIndustrial(volume);
-    } else if (soundType === 'classic-beep') {
-      this.startClassicBeep(volume);
-    } else if (soundType === 'air-horn') {
-      this.startAirHorn(volume);
-    } else {
-      this.startIndustrial(volume);
+    switch (soundType) {
+      case 'industrial':
+        this.startIndustrial(volume);
+        break;
+      case 'classic-beep':
+        this.startClassicBeep(volume);
+        break;
+      case 'air-horn':
+        this.startAirHorn(volume);
+        break;
     }
   }
 

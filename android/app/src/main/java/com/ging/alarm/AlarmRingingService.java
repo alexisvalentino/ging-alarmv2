@@ -38,7 +38,7 @@ public class AlarmRingingService extends Service {
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private volatile boolean shouldRing;
-    private volatile String soundType = "industrial";
+    private volatile String soundType = AlarmSounds.INDUSTRIAL;
     private String alarmId;
     private AudioTrack audioTrack;
     private Thread audioThread;
@@ -57,7 +57,7 @@ public class AlarmRingingService extends Service {
         Intent intent = new Intent(context, AlarmRingingService.class)
             .setAction(ACTION_START)
             .putExtra(EXTRA_ALARM_ID, alarmId)
-            .putExtra(EXTRA_SOUND_TYPE, soundType == null ? "industrial" : soundType);
+            .putExtra(EXTRA_SOUND_TYPE, AlarmSounds.normalize(soundType));
         ContextCompat.startForegroundService(context, intent);
     }
 
@@ -94,7 +94,7 @@ public class AlarmRingingService extends Service {
         if (alarmId == null) {
             android.content.SharedPreferences preferences = getSharedPreferences(SERVICE_PREFERENCES, MODE_PRIVATE);
             alarmId = preferences.getString(STORED_ALARM_ID, null);
-            String storedSound = preferences.getString(STORED_SOUND_TYPE, "industrial");
+            String storedSound = preferences.getString(STORED_SOUND_TYPE, AlarmSounds.INDUSTRIAL);
             if (isSupportedSound(storedSound)) soundType = storedSound;
         } else {
             getSharedPreferences(SERVICE_PREFERENCES, MODE_PRIVATE)
@@ -253,14 +253,14 @@ public class AlarmRingingService extends Service {
 
     private float alarmSample(String selectedSound, long frame) {
         double time = frame / (double) SAMPLE_RATE;
-        if ("classic-beep".equals(selectedSound)) {
+        if (AlarmSounds.CLASSIC_BEEP.equals(selectedSound)) {
             double phase = time % 0.25;
             if (phase >= 0.18) return 0f;
             double fadeIn = Math.min(1d, phase * 30d);
             double fadeOut = Math.min(1d, (0.18d - phase) * 30d);
             return (float) (Math.sin(2d * Math.PI * 2500d * time) * fadeIn * fadeOut);
         }
-        if ("air-horn".equals(selectedSound)) {
+        if (AlarmSounds.AIR_HORN.equals(selectedSound)) {
             double modulatedFrequency = 150d + 8d * Math.sin(2d * Math.PI * 8d * time);
             double first = sawtooth(time * modulatedFrequency);
             double second = sawtooth(time * 225d);
@@ -322,8 +322,6 @@ public class AlarmRingingService extends Service {
     }
 
     private static boolean isSupportedSound(String soundType) {
-        return "industrial".equals(soundType)
-            || "classic-beep".equals(soundType)
-            || "air-horn".equals(soundType);
+        return AlarmSounds.isSupported(soundType);
     }
 }

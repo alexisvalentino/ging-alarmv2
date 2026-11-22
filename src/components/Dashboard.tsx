@@ -9,6 +9,7 @@ import {
   Plus, Play, Square, QrCode, X, Minus, Tag, Volume2
 } from 'lucide-react';
 import { Alarm } from '../types';
+import { ALARM_SOUND_OPTIONS, AlarmSoundType } from '../constants/alarmSounds';
 import { gingAudio } from '../utils/audio';
 import { lightHaptic, successHaptic } from '../utils/haptics';
 import TimeWheelPicker from './TimeWheelPicker';
@@ -34,15 +35,6 @@ const splitTime = (time24: string): { time: string; suffix: string } => {
   if (idx === -1) return { time: f, suffix: '' };
   return { time: f.slice(0, idx), suffix: f.slice(idx + 1) };
 };
-
-const SOUND_LABELS: { key: Alarm['soundType']; label: string }[] = [
-  { key: 'industrial', label: 'Industrial' },
-  { key: 'classic-beep', label: 'Beep' },
-  { key: 'air-horn', label: 'Air Horn' },
-];
-
-const soundLabel = (key: Alarm['soundType']) =>
-  SOUND_LABELS.find(s => s.key === key)?.label ?? key;
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -76,7 +68,7 @@ export default function Dashboard({
   const [showAddForm, setShowAddForm] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editingAlarmId, setEditingAlarmId] = useState<string | null>(null);
-  const [newTime, setNewTime] = useState('06:00');
+  const [newTime, setNewTime] = useState<string | null>(null);
   const [newLabel, setNewLabel] = useState('');
   const [newDays, setNewDays] = useState<number[]>([1, 2, 3, 4, 5]); // weekdays by default
   const [newSoundType, setNewSoundType] = useState<Alarm['soundType']>('industrial');
@@ -116,7 +108,7 @@ export default function Dashboard({
   };
 
   // Sound preview handler — plays 1.5s sample then auto-stops
-  const handlePreviewSound = useCallback((soundKey: string) => {
+  const handlePreviewSound = useCallback((soundKey: AlarmSoundType) => {
     // If already previewing this sound, stop it
     if (previewPlaying === soundKey) {
       gingAudio.stop();
@@ -144,7 +136,7 @@ export default function Dashboard({
     previewTimerRef.current = null;
     setPreviewPlaying(null);
     setShowAddForm(false);
-    setNewTime('06:00');
+    setNewTime(null);
     setNewLabel('');
     setNewDays([1, 2, 3, 4, 5]);
     setNewSoundType('industrial');
@@ -210,6 +202,7 @@ export default function Dashboard({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newTime || newDays.length === 0) return;
     onAddAlarm({
       time: newTime,
       label: newLabel.trim() || 'Alarm',
@@ -220,10 +213,12 @@ export default function Dashboard({
       qrSecret: userQRSecret,
     });
     void successHaptic();
+    setEditing(false);
+    setEditingAlarmId(null);
     closeSheet();
   };
 
-  const selectSound = (soundType: Alarm['soundType']) => {
+  const selectSound = (soundType: AlarmSoundType) => {
     if (soundType !== newSoundType) void lightHaptic();
     setNewSoundType(soundType);
   };
@@ -285,9 +280,7 @@ export default function Dashboard({
             <AnimatePresence initial={false}>
               {alarms.map((alarm) => {
                 const { time, suffix } = splitTime(alarm.time);
-                const alarmLabel = alarm.id === 'default-morning' && alarm.label === 'Bathroom Mirror Session'
-                  ? 'Morning alarm'
-                  : alarm.label;
+                const alarmLabel = alarm.label;
                 const rowEditing = editing || editingAlarmId === alarm.id;
                 return (
                   <motion.div
@@ -450,7 +443,7 @@ export default function Dashboard({
                   <div className="alarm-sound-field">
                     <p id="alarm-sound-label" className="alarm-field-label block text-[12px] font-medium text-zinc-400 mb-2">Sound</p>
                     <div className="sound-options" role="group" aria-labelledby="alarm-sound-label">
-                      {SOUND_LABELS.map((snd) => {
+                      {ALARM_SOUND_OPTIONS.map((snd) => {
                         const isSelected = snd.key === newSoundType;
                         const isPreviewing = previewPlaying === snd.key;
                         return (
@@ -460,7 +453,7 @@ export default function Dashboard({
                           >
                             <button
                               type="button"
-                              onClick={() => selectSound(snd.key as Alarm['soundType'])}
+                              onClick={() => selectSound(snd.key)}
                               aria-pressed={isSelected}
                               className="sound-option-select"
                             >
@@ -472,7 +465,7 @@ export default function Dashboard({
                             <button
                               type="button"
                               onClick={() => {
-                                selectSound(snd.key as Alarm['soundType']);
+                                selectSound(snd.key);
                                 handlePreviewSound(snd.key);
                               }}
                               aria-label={`${isPreviewing ? 'Stop' : 'Preview'} ${snd.label}`}
@@ -515,13 +508,13 @@ export default function Dashboard({
 
                   <button
                     type="submit"
-                    disabled={newDays.length === 0}
-                    className={`w-full py-3.5 rounded-2xl font-sans font-semibold text-[15px] transition-colors ${newDays.length > 0
+                    disabled={!newTime || newDays.length === 0}
+                    className={`w-full py-3.5 rounded-2xl font-sans font-semibold text-[15px] transition-colors ${newTime && newDays.length > 0
                         ? 'glass-button-glow cursor-pointer'
                         : 'bg-white/[0.04] text-zinc-500 border border-dashed border-white/[0.08] cursor-not-allowed'
                       }`}
                   >
-                    {newDays.length > 0 ? 'Save Alarm' : 'Select at least one day'}
+                    {!newTime ? 'Choose a time' : newDays.length > 0 ? 'Save Alarm' : 'Select at least one day'}
                   </button>
                 </form>
               </div>

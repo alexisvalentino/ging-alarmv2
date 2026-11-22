@@ -20,7 +20,7 @@ const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
 const PERIODS = ['AM', 'PM'];
 
 interface TimeWheelPickerProps {
-  value: string;            // "HH:MM" 24-hour
+  value: string | null;     // "HH:MM" 24-hour; null until the user chooses a time
   onChange: (v: string) => void;
 }
 
@@ -46,6 +46,7 @@ function to24h(hour12: number, minute: string, period: 'AM' | 'PM') {
 function Wheel({
   items,
   index,
+  hasSelection,
   onIndexChange,
   label,
   width,
@@ -53,6 +54,7 @@ function Wheel({
 }: {
   items: (string | number)[];
   index: number;
+  hasSelection: boolean;
   onIndexChange: (i: number) => void;
   label: string;
   width: string;
@@ -135,7 +137,7 @@ function Wheel({
       const i = Math.round(el.scrollTop / ITEM_HEIGHT);
       const clamped = Math.max(0, Math.min(items.length - 1, i));
       setVisualIndex(clamped);
-      if (clamped !== index) {
+      if (!hasSelection || clamped !== index) {
         onIndexChange(clamped);
       } else {
         // Snap correction if the user landed between rows.
@@ -150,8 +152,22 @@ function Wheel({
     }, 90);
   };
 
-  const handlePointerUp = () => {
-    if (!didScrollRef.current) endTouchSelection();
+  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!didScrollRef.current && !hasSelection && ref.current) {
+      const bounds = ref.current.getBoundingClientRect();
+      const localY = event.clientY - bounds.top;
+      const tappedIndex = Math.max(0, Math.min(items.length - 1,
+        Math.round((ref.current.scrollTop + localY - PAD - ITEM_HEIGHT / 2) / ITEM_HEIGHT)));
+      void changeSelectionHaptic();
+      onIndexChange(tappedIndex);
+    }
+    didScrollRef.current = false;
+    endTouchSelection();
+  };
+
+  const handlePointerCancel = () => {
+    didScrollRef.current = false;
+    endTouchSelection();
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -163,7 +179,7 @@ function Wheel({
     else return;
 
     event.preventDefault();
-    if (nextIndex !== index) {
+    if (nextIndex !== index || !hasSelection) {
       void selectionTickHaptic();
       onIndexChange(nextIndex);
     }
@@ -190,15 +206,15 @@ function Wheel({
       onScroll={handleScroll}
       onPointerDown={beginTouchSelection}
       onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
       onKeyDown={handleKeyDown}
       ref={ref}
       role="spinbutton"
       aria-label={label}
       aria-valuemin={isNumericWheel ? firstValue : 1}
       aria-valuemax={isNumericWheel ? lastValue : items.length}
-      aria-valuenow={isNumericWheel ? Number(items[visualIndex]) : visualIndex + 1}
-      aria-valuetext={`${label} ${format(items[visualIndex])}`}
+      aria-valuenow={hasSelection ? (isNumericWheel ? Number(items[visualIndex]) : visualIndex + 1) : undefined}
+      aria-valuetext={hasSelection ? `${label} ${format(items[visualIndex])}` : `${label} not selected`}
       tabIndex={0}
     >
       {items.map((item, i) => (
@@ -213,7 +229,7 @@ function Wheel({
             color: i === visualIndex ? 'var(--ging-ink)' : 'rgba(90, 65, 55, 0.44)',
           }}
         >
-          {format(item)}
+          {!hasSelection && i === visualIndex ? '—' : format(item)}
         </div>
       ))}
     </div>
@@ -242,6 +258,7 @@ export default function TimeWheelPicker({ value, onChange }: TimeWheelPickerProp
         <Wheel
           items={HOURS_12}
           index={hourIdx < 0 ? 5 : hourIdx}
+          hasSelection={value !== null}
           onIndexChange={(i) => emit(i, minute, period)}
           label="Hour"
           width="78px"
@@ -250,6 +267,7 @@ export default function TimeWheelPicker({ value, onChange }: TimeWheelPickerProp
         <Wheel
           items={MINUTES}
           index={minuteIdx < 0 ? 0 : minuteIdx}
+          hasSelection={value !== null}
           onIndexChange={(i) => emit(hourIdx < 0 ? 5 : hourIdx, MINUTES[i], period)}
           label="Minute"
           width="78px"
@@ -257,6 +275,7 @@ export default function TimeWheelPicker({ value, onChange }: TimeWheelPickerProp
         <Wheel
           items={PERIODS}
           index={periodIdx < 0 ? 0 : periodIdx}
+          hasSelection={value !== null}
           onIndexChange={(i) => emit(hourIdx < 0 ? 5 : hourIdx, minute, PERIODS[i] as 'AM' | 'PM')}
           label="AM or PM"
           width="62px"

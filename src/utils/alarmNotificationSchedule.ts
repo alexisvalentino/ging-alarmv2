@@ -1,5 +1,6 @@
 import { Weekday, type LocalNotificationSchema } from '@capacitor/local-notifications';
 import type { Alarm } from '../types';
+import { ALARM_SOUND_OPTIONS } from '../constants/alarmSounds';
 
 const NOTIFICATION_SOURCE = 'ging-alarm';
 
@@ -74,7 +75,8 @@ export function buildAlarmNotifications(alarms: Alarm[]): LocalNotificationSchem
         id,
         title: 'Ging alarm',
         body: 'It is time to wake up. Open Ging and scan your wake-up code to stop the alarm.',
-        sound: 'default',
+        sound: ALARM_SOUND_OPTIONS.find(option => option.key === alarm.soundType)?.notificationFile
+          ?? ALARM_SOUND_OPTIONS[0].notificationFile,
         ongoing: true,
         autoCancel: false,
         foreground: false,

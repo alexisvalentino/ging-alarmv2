@@ -12,6 +12,7 @@ import { Alarm, PermissionItem, AppState } from './types';
 import Splash from './components/Splash';
 import StartupScreen from './components/StartupScreen';
 import { generateWakeUpSecret } from './utils/qrSecret';
+import { restoreAlarmSound, restoreSavedAlarms } from './utils/restoreSavedAlarms';
 import { mergePermissionsWithDefaults } from './utils/permissionState';
 import {
   checkAlarmNotificationReadiness,
@@ -103,7 +104,9 @@ export default function App() {
         const rawPermissions = applyPlatformPermissionDefaults(
           mergePermissionsWithDefaults(initialPermissions, parsed.permissions)
         );
-        const pendingAlarm: Alarm | null = hasOnboarded ? parsed.activeRingingAlarm || null : null;
+        const pendingAlarm: Alarm | null = hasOnboarded
+          ? restoreAlarmSound(parsed.activeRingingAlarm)
+          : null;
 
         // Force reset to false if onboarding is not completed to ensure they are prompted
         const freshPermissions = hasOnboarded
@@ -114,7 +117,7 @@ export default function App() {
           currentView: pendingAlarm ? 'ringing' : hasOnboarded ? 'dashboard' : 'splash',
           hasCompletedOnboarding: hasOnboarded,
           activeRingingAlarm: pendingAlarm,
-          alarms: parsed.alarms || [],
+          alarms: restoreSavedAlarms(parsed.alarms),
           permissions: freshPermissions,
           userQRSecret: parsed.userQRSecret || generateWakeUpSecret(),
           streak: parsed.streak || 0,
@@ -127,24 +130,11 @@ export default function App() {
 
     // Default pristine state
     const defaultSecret = generateWakeUpSecret();
-    const defaultAlarms: Alarm[] = [
-      {
-        id: 'default-morning',
-        time: '06:00',
-        label: 'Morning alarm',
-        active: true,
-        days: [1, 2, 3, 4, 5], // Monday through Friday
-        volume: 1.0,
-        soundType: 'industrial',
-        qrSecret: defaultSecret
-      }
-    ];
-
     return {
       currentView: 'splash',
       hasCompletedOnboarding: false,
       activeRingingAlarm: null,
-      alarms: defaultAlarms,
+      alarms: [],
       permissions: applyPlatformPermissionDefaults(initialPermissions),
       userQRSecret: defaultSecret,
       streak: 5, // give them a nice initial momentum streak to cherish!

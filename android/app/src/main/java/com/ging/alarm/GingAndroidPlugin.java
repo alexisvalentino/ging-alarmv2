@@ -24,7 +24,7 @@ public class GingAndroidPlugin extends Plugin {
         
         if (active) {
             String alarmId = call.getString("alarmId", "active-alarm");
-            String soundType = call.getString("soundType", "industrial");
+            String soundType = AlarmSounds.normalize(call.getString("soundType", AlarmSounds.INDUSTRIAL));
             MainActivity.isAlarmActive = true;
             AlarmRingingService.start(getContext(), alarmId, soundType);
 

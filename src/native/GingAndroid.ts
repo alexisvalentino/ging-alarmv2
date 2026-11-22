@@ -1,13 +1,14 @@
 import { registerPlugin } from '@capacitor/core';
+import type { AlarmSoundType } from '../constants/alarmSounds';
 
 export interface GingAndroidPlugin {
-  setAlarmActive(options: { active: boolean; alarmId?: string; soundType?: string }): Promise<void>;
+  setAlarmActive(options: { active: boolean; alarmId?: string; soundType?: AlarmSoundType }): Promise<void>;
   syncAlarmSchedules(options: { alarms: Array<{
     id: string;
     time: string;
     days: number[];
     active: boolean;
-    soundType: string;
+    soundType: AlarmSoundType;
   }> }): Promise<void>;
   consumePendingAlarmTrigger(): Promise<{ alarmId?: string | null }>;
   forceMaxVolume(): Promise<void>;

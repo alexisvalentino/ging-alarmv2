@@ -3,6 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { AlarmSoundType } from './constants/alarmSounds';
+export { ALARM_SOUND_TYPES } from './constants/alarmSounds';
+export type { AlarmSoundType } from './constants/alarmSounds';
+
 export interface Alarm {
   id: string;
   time: string; // "HH:MM"
@@ -10,7 +14,7 @@ export interface Alarm {
   active: boolean;
   days: number[]; // 0 = Sunday, 1 = Monday, etc.
   volume: number; // 0 to 1
-  soundType: 'industrial' | 'classic-beep' | 'air-horn';
+  soundType: AlarmSoundType;
   qrSecret: string; // The specific QR code secret this alarm requires to turn off
 }
 
