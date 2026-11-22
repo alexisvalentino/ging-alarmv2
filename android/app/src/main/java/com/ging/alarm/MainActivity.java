@@ -2,8 +2,10 @@ package com.ging.alarm;
 
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.PowerManager;
+import android.view.KeyEvent;
 import android.view.WindowManager;
 import com.getcapacitor.BridgeActivity;
 
@@ -52,6 +54,21 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (isAlarmActive && event.getKeyCode() == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            // Block only attempts to lower the alarm volume. Correct it once per press,
+            // without repeatedly opening Android's system volume panel.
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                restoreAlarmVolume();
+            }
+            return true;
+        }
+
+        // Volume-up and all other keys retain the platform's normal behavior.
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override
     public void onPause() {
         super.onPause();
         if (isAlarmActive) {
@@ -78,6 +95,21 @@ public class MainActivity extends BridgeActivity {
                     cpuWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Ging::CpuWakeLock");
                     cpuWakeLock.acquire();
                 }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void restoreAlarmVolume() {
+        try {
+            AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            if (audioManager == null) return;
+
+            int currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+            int maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+            if (currentVolume < maxVolume) {
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVolume, 0);
             }
         } catch (Exception e) {
             e.printStackTrace();

@@ -894,21 +894,7 @@ body {
 }
 
 .ringing-camera-view {
-  aspect-ratio: 3 / 4;
-}
-
-.ringing-time h2 {
-  font-size: clamp(2.75rem, 12vw, 3.75rem) !important;
-  line-height: 1;
-  color: #FFFFFF !important;
-}
-
-.ging-screen--ringing.ambient-glow-bg {
-  background: linear-gradient(180deg, #A43E00 0%, #FF6B1A 24%, #FFF1EC 62%, #FFF8F6 100%);
-}
-
-.ging-screen--ringing .ringing-title [class~="text-white"] {
-  color: #FFFFFF !important;
+  aspect-ratio: 4 / 5;
 }
 
 .repeat-picker button {
@@ -1256,19 +1242,17 @@ body {
 
   .ringing-header,
   .ringing-main {
-    max-width: min(100%, 1080px) !important;
+    max-width: min(100%, 680px) !important;
   }
 
   .ringing-main {
-    display: grid;
-    grid-template-columns: minmax(260px, 0.85fr) minmax(320px, 1.15fr);
-    grid-template-areas:
-      "clock camera"
-      "hint camera";
+    display: flex;
+    flex-direction: column;
     align-content: center;
     align-items: center;
-    gap: 14px 36px;
-    padding-block: 24px;
+    justify-content: center;
+    gap: 0;
+    padding-block: 20px;
   }
 
   .ringing-main > * {
@@ -1276,18 +1260,8 @@ body {
     margin-bottom: 0;
   }
 
-  .ringing-time {
-    grid-area: clock;
-    align-self: end;
-  }
-
   .ringing-camera {
-    grid-area: camera;
-  }
-
-  .ringing-hint {
-    grid-area: hint;
-    align-self: start;
+    width: 100%;
   }
 
   .ringing-camera-view {

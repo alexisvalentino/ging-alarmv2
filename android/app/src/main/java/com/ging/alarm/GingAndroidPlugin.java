@@ -49,10 +49,13 @@ public class GingAndroidPlugin extends Plugin {
         try {
             AudioManager audioManager = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
             if (audioManager != null) {
-                // Fetch device maximum media volume stream setting
+                // Set max once when the alarm starts. Hardware volume-down presses
+                // are handled by MainActivity without showing the system panel.
+                int currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
                 int maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-                // Force the media volume to 100% full volume with standard notification banner
-                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVolume, AudioManager.FLAG_SHOW_UI);
+                if (currentVolume < maxVolume) {
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVolume, 0);
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();

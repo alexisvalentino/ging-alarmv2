@@ -21,7 +21,6 @@ interface AlarmRingerProps {
 }
 
 export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
-  const [currentTimeStr, setCurrentTimeStr] = useState('');
   const [scanStatus, setScanStatus] = useState<'scanning' | 'wrong-code' | 'authenticated'>('scanning');
   const scanStatusRef = useRef<'scanning' | 'wrong-code' | 'authenticated'>('scanning');
 
@@ -32,7 +31,6 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
 
   const [errorText, setErrorText] = useState<string | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
-  const [cameraLabel, setCameraLabel] = useState('Default Camera');
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -45,7 +43,7 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
   const dismissTimerRef = useRef<number | null>(null);
   const wrongCodeTimerRef = useRef<number | null>(null);
 
-  // Sound triggering and live clock
+  // Start the alarm audio and enable strict native alarm behavior.
   useEffect(() => {
     // Start playing the brutal audio on load at absolute maximum volume!
     try {
@@ -55,30 +53,13 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
       console.error('Alarm audio could not start:', err);
     }
 
-    let volumeGuardInterval: number | null = null;
-
     // Lock the native Android back-buttons and system-exits during alarm ringing
     if (Capacitor.getPlatform() === 'android') {
       GingAndroid.setAlarmActive({ active: true }).catch(err => console.error(err));
       GingAndroid.forceMaxVolume().catch(err => console.error(err));
-
-      // Continually override and enforce 100% full system speaker volume every 2.5 seconds!
-      // This blocks the user from muting GING using their physical hardware volume-down keys.
-      volumeGuardInterval = window.setInterval(() => {
-        GingAndroid.forceMaxVolume().catch(err => console.error(err));
-      }, 2500);
     }
 
-    const updateClock = () => {
-      const now = new Date();
-      setCurrentTimeStr(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }));
-    };
-    updateClock();
-    const interval = setInterval(updateClock, 1000);
-
     return () => {
-      clearInterval(interval);
-      if (volumeGuardInterval) clearInterval(volumeGuardInterval);
       if (dismissTimerRef.current) window.clearTimeout(dismissTimerRef.current);
       if (wrongCodeTimerRef.current) window.clearTimeout(wrongCodeTimerRef.current);
       gingAudio.stop();
@@ -148,9 +129,6 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
       await video.play();
       if (!isCurrentRequest() || mediaStreamRef.current !== acquiredStream) return;
       setIsCameraActive(true);
-
-      setCameraLabel(videoTrack.label || 'Default Camera');
-      console.log('Using camera device:', videoTrack.label);
 
       scheduleScanFrame();
     } catch (err: any) {
@@ -290,7 +268,7 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
   };
 
   return (
-    <div className="relative min-h-dvh text-white select-none flex flex-col overflow-x-hidden font-sans ambient-glow-bg ging-screen ging-screen--ringing">
+    <div className="relative min-h-dvh text-[#261813] select-none flex flex-col overflow-x-hidden font-sans ambient-glow-bg ging-screen ging-screen--ringing">
       {/* Hidden processing canvas used for frame analysis */}
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
@@ -302,7 +280,7 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
       <div className="max-w-md w-full mx-auto flex items-center justify-between px-6 pt-5 pb-3 z-10 ringing-header">
         <div className="ringing-title">
           <img src="/gingy-mascot-cutout.webp" alt="" aria-hidden="true" className="ringing-mascot" />
-          <span className="font-sans font-semibold text-[17px] text-white tracking-tight truncate">
+          <span className="font-sans font-semibold text-[17px] text-[#261813] tracking-tight truncate">
             {alarm.label || 'Alarm'}
           </span>
         </div>
@@ -316,17 +294,9 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
 
       {/* Main */}
       <div className="flex-1 max-w-md w-full mx-auto px-6 py-4 flex flex-col z-10 space-y-5 ringing-main">
-
-        {/* Big clock */}
-        <div className="text-center ringing-time">
-          <h2 className="text-[56px] font-semibold tracking-tight text-white tabular-nums">
-            {currentTimeStr || '--:--'}
-          </h2>
-        </div>
-
         {/* Camera viewport — always mounted so the stream is never disconnected */}
         <div className="relative glass-card rounded-3xl overflow-hidden ringing-camera">
-          <div className="aspect-[3/4] relative bg-black ringing-camera-view">
+          <div className="aspect-[4/5] relative bg-black ringing-camera-view">
             {!isCameraActive && !errorText && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-500 gap-3 p-4 text-center z-10 camera-loading">
                 <RefreshCw className="w-8 h-8 animate-spin text-zinc-400" />
@@ -421,23 +391,18 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
             </AnimatePresence>
           </div>
 
-          {/* Camera status strip — integrated into glass-card border */}
-          {scanStatus !== 'authenticated' && (
-            <div className="px-4 py-2.5 flex justify-between items-center text-[12px] border-t border-white/[0.06]">
-              <span className="truncate max-w-[200px] text-zinc-500">{cameraLabel}</span>
-              <span className={`font-medium tabular-nums ${errorText || scanStatus === 'wrong-code' ? 'text-red-400' : 'text-ging-orange'}`}>
+          {/* Keep camera diagnostics out of the alarm UI; the task is simply to scan. */}
+          {scanStatus !== 'authenticated' && (isCameraActive || errorText) && (
+            <div className="px-4 py-3 flex justify-center items-center text-[13px] border-t border-[rgba(164,62,0,0.1)]" role="status" aria-live="polite">
+              <span className={`inline-flex items-center gap-2 font-medium ${errorText || scanStatus === 'wrong-code' ? 'text-red-400' : 'text-ging-burnt'}`}>
+                {!errorText && isCameraActive && scanStatus === 'scanning' && (
+                  <span className="w-2 h-2 rounded-full soft-pulse bg-ging-orange" aria-hidden="true" />
+                )}
                 {errorText ? 'Camera unavailable' : scanStatus === 'wrong-code' ? 'Retrying' : 'Scanning'}
               </span>
             </div>
           )}
         </div>
-
-        {/* Help hint — single subtle line */}
-        {scanStatus !== 'wrong-code' && (
-          <p className="text-center text-[13px] text-zinc-500 font-medium pb-2 ringing-hint">
-            Scan your QR code to turn off the alarm
-          </p>
-        )}
       </div>
     </div>
   );
