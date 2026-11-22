@@ -19,7 +19,26 @@ coverage/
 *.pem
 *.p12
 *.pfx
+*.p8
+*.cer
+*.mobileprovision
+*.provisionprofile
 key.properties
+/secrets/
+/secret/
+/credentials/
+/secret.json
+/secrets.json
+/credentials.json
+*.credentials
+*.credentials.json
+
+# Local conversation exports (Codex chat history is stored outside this repo)
+/chat-history/
+/conversation-history/
+/conversations/
+*.chatlog
+*.conversation.json
 
 # Local agent state and design references
 .impeccable/
@@ -49,3 +68,12 @@ android/build/
 android/local.properties
 android/app/src/main/assets/public/
 android/app/src/main/assets/capacitor.config.json
+
+# iOS signing material and build products
+ios/App/Pods/
+ios/App/build/
+ios/App/DerivedData/
+ios/App/App/public/
+ios/App/App/capacitor.config.json
+xcuserdata/
+*.xcuserstate
