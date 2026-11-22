@@ -56,17 +56,22 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
 
   // Start the alarm audio and enable strict native alarm behavior.
   useEffect(() => {
-    // Start playing the brutal audio on load at absolute maximum volume!
-    try {
-      gingAudio.start(alarm.soundType, 1.0);
-    } catch (err) {
-      // Keep applying the native alarm lock even if Web Audio is unavailable.
-      console.error('Alarm audio could not start:', err);
+    const isNativeAndroid = Capacitor.getPlatform() === 'android';
+
+    // Android's foreground ringing service owns playback so the alarm keeps
+    // sounding even when the WebView is backgrounded or the app is closed.
+    if (!isNativeAndroid) {
+      try {
+        gingAudio.start(alarm.soundType, 1.0);
+      } catch (err) {
+        console.error('Alarm audio could not start:', err);
+      }
     }
 
     // Lock the native Android back-buttons and system-exits during alarm ringing
-    if (Capacitor.getPlatform() === 'android') {
-      GingAndroid.setAlarmActive({ active: true }).catch(err => console.error(err));
+    if (isNativeAndroid) {
+      GingAndroid.setAlarmActive({ active: true, alarmId: alarm.id, soundType: alarm.soundType })
+        .catch(err => console.error(err));
       GingAndroid.forceMaxVolume().catch(err => console.error(err));
     }
 
@@ -77,7 +82,7 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
       stopCamera();
 
       // Release native lock when alarm is successfully dismissed
-      if (Capacitor.getPlatform() === 'android') {
+      if (isNativeAndroid) {
         GingAndroid.setAlarmActive({ active: false }).catch(err => console.error(err));
       }
     };

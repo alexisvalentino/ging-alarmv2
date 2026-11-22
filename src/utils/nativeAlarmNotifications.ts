@@ -1,7 +1,9 @@
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Alarm } from '../types';
+import { GingAndroid } from '../native/GingAndroid';
 import { buildAlarmNotifications, getAlarmNotificationMetadata, NOTIFICATION_SOURCE } from './alarmNotificationSchedule';
+import { buildNativeAlarmSchedules } from './nativeAlarmSchedule';
 
 export interface AlarmNotificationReadiness {
   available: boolean;
@@ -59,6 +61,29 @@ export async function requestAlarmNotificationReadiness(): Promise<AlarmNotifica
 
 async function syncAlarmNotificationsNow(alarms: Alarm[]) {
   if (!Capacitor.isNativePlatform()) return;
+
+  if (Capacitor.getPlatform() === 'android') {
+    // Remove Android notifications from older Ging versions before switching
+    // to an AlarmManager receiver that starts the ringing service itself.
+    const pending = await LocalNotifications.getPending();
+    const oldNotifications = pending.notifications
+      .filter(notification => notification.extra?.source === NOTIFICATION_SOURCE)
+      .map(({ id }) => ({ id }));
+    if (oldNotifications.length > 0) {
+      await LocalNotifications.cancel({ notifications: oldNotifications });
+    }
+
+    const readiness = await checkAlarmNotificationReadiness();
+    if (!readiness.ready && alarms.some(alarm => alarm.active)) {
+      await GingAndroid.syncAlarmSchedules({ alarms: [] });
+      throw new Error('Ging alarm notifications are not enabled for this device.');
+    }
+
+    await GingAndroid.syncAlarmSchedules({
+      alarms: buildNativeAlarmSchedules(alarms)
+    });
+    return;
+  }
 
   const pending = await LocalNotifications.getPending();
   const ownedNotifications = pending.notifications

@@ -24,20 +24,20 @@ Ging is a QR-code alarm app. To dismiss a ringing alarm, the user scans their ow
 - Create alarms with a time, label, sound, and repeat days.
 - Generate a personal wake-up QR code and save it as an image or printable PDF.
 - Scan and validate the code locally with the device camera; only an exact match to the saved code dismisses the alarm.
-- Play alarm sounds with the Web Audio API.
-- Schedule native local alerts for active alarms and repeat days.
+- Play selected alarm sounds through Android's native alarm audio service, with Web Audio playback on iOS and web.
+- Schedule exact native alarms for active alarms and repeat days.
 - Present a guided setup flow for camera, audio, notifications, and platform-specific settings.
 - Use a warm, mascot-led interface with a branded startup screen and platform app icons.
 
 ### Android alarm behavior
 
-On Android, an exact native alert is scheduled for each enabled alarm day. Tapping it opens Ging's ringing screen. While that screen is active, Ging raises media volume to maximum, reapplies it every 2.5 seconds, blocks the hardware Back action, keeps the display awake, and attempts to return to the ringing screen if it is sent to the background. The screen has no snooze or manual dismiss action; a matching QR scan is the only in-app dismissal path. Android may still allow system-level actions such as force-stopping or powering off the device.
+On Android, each active alarm day is scheduled with `AlarmManager` as an exact alarm. When it fires, a native foreground audio service starts the selected alarm sound and maximum alarm volume without waiting for a notification tap or the WebView to be running. An ongoing, quiet lock-screen notification opens Ging directly to that alarm's QR scanner when tapped. The service reapplies maximum alarm and media volume while ringing; the app blocks Back and attempts to return to the ringing screen when backgrounded. A matching QR scan is the only in-app way to stop it. Android can still allow system-level actions such as force-stopping or powering off the device, and lock-screen notification visibility depends on the device's notification settings.
 
 On iOS, Ging schedules native local alerts. Tapping an alert opens the app, where scanning the matching QR code dismisses the in-app ringer. iOS does not allow third-party apps to continuously override system volume or prevent system-level dismissal while backgrounded, so iOS alert delivery cannot enforce the Android ringing behavior.
 
-Exact Android alerts require notification permission and the system's **Alarms & reminders** access. If either is disabled, Ging returns to setup and does not claim the alarm is scheduled. Notification alerts depend on the operating system's notification and sound settings.
+Android exact alarms require notification permission and the system's **Alarms & reminders** access. If either is disabled, Ging returns to setup and removes its scheduled alarms. The native ringing service restores alarm schedules after reboot and clock or time-zone changes. Lock-screen notification visibility still depends on the operating system's notification settings.
 
-These behaviors are implemented across `src/components/AlarmRinger.tsx`, `src/native/GingAndroid.ts`, `src/utils/nativeAlarmNotifications.ts`, `android/app/src/main/java/com/ging/alarm/GingAndroidPlugin.java`, and `MainActivity.java`.
+These behaviors are implemented across `src/components/AlarmRinger.tsx`, `src/native/GingAndroid.ts`, `src/utils/nativeAlarmNotifications.ts`, `android/app/src/main/java/com/ging/alarm/AlarmScheduler.java`, `AlarmReceiver.java`, `AlarmRingingService.java`, `AlarmRescheduleReceiver.java`, `GingAndroidPlugin.java`, and `MainActivity.java`.
 
 ## Tech stack
 

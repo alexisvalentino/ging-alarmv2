@@ -9,6 +9,7 @@ import android.os.PowerManager;
 import android.provider.Settings;
 import android.view.WindowManager;
 import com.getcapacitor.JSObject;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -20,9 +21,13 @@ public class GingAndroidPlugin extends Plugin {
     @PluginMethod
     public void setAlarmActive(PluginCall call) {
         boolean active = call.getBoolean("active", false);
-        MainActivity.isAlarmActive = active;
         
         if (active) {
+            String alarmId = call.getString("alarmId", "active-alarm");
+            String soundType = call.getString("soundType", "industrial");
+            MainActivity.isAlarmActive = true;
+            AlarmRingingService.start(getContext(), alarmId, soundType);
+
             // Force screen wake up and bring app directly over lockscreen to foreground
             getActivity().runOnUiThread(new Runnable() {
                 @Override
@@ -40,8 +45,31 @@ public class GingAndroidPlugin extends Plugin {
                     getContext().startActivity(intent);
                 }
             });
+        } else {
+            MainActivity.isAlarmActive = false;
+            AlarmRingingService.stop(getContext());
         }
         call.resolve();
+    }
+
+    @PluginMethod
+    public void syncAlarmSchedules(PluginCall call) {
+        try {
+            JSArray alarms = call.getArray("alarms", new JSArray());
+            AlarmScheduler.sync(getContext(), alarms);
+            call.resolve();
+        } catch (SecurityException error) {
+            call.reject(error.getMessage());
+        } catch (Exception error) {
+            call.reject("Could not schedule Ging alarms: " + error.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void consumePendingAlarmTrigger(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("alarmId", MainActivity.consumePendingAlarmTrigger());
+        call.resolve(result);
     }
 
     @PluginMethod
@@ -55,6 +83,11 @@ public class GingAndroidPlugin extends Plugin {
                 int maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
                 if (currentVolume < maxVolume) {
                     audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVolume, 0);
+                }
+                int currentAlarmVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM);
+                int maxAlarmVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM);
+                if (currentAlarmVolume < maxAlarmVolume) {
+                    audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxAlarmVolume, 0);
                 }
             }
         } catch (Exception e) {

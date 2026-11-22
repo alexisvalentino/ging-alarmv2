@@ -1,7 +1,15 @@
 import { registerPlugin } from '@capacitor/core';
 
 export interface GingAndroidPlugin {
-  setAlarmActive(options: { active: boolean }): Promise<void>;
+  setAlarmActive(options: { active: boolean; alarmId?: string; soundType?: string }): Promise<void>;
+  syncAlarmSchedules(options: { alarms: Array<{
+    id: string;
+    time: string;
+    days: number[];
+    active: boolean;
+    soundType: string;
+  }> }): Promise<void>;
+  consumePendingAlarmTrigger(): Promise<{ alarmId?: string | null }>;
   forceMaxVolume(): Promise<void>;
   checkBatteryBypass(): Promise<{ granted: boolean }>;
   requestBatteryBypass(): Promise<{ requested: boolean }>;

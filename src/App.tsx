@@ -7,6 +7,7 @@ import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { GingAndroid } from './native/GingAndroid';
 import { Alarm, PermissionItem, AppState } from './types';
 import Splash from './components/Splash';
 import StartupScreen from './components/StartupScreen';
@@ -297,6 +298,38 @@ export default function App() {
     return () => {
       disposed = true;
       for (const handle of handles) void handle.remove();
+    };
+  }, [activateAlarm]);
+
+  // A tap on the native Android ringing notification carries the alarm ID
+  // into the Activity so the app opens directly on its QR scanner.
+  useEffect(() => {
+    if (Capacitor.getPlatform() !== 'android') return;
+
+    let disposed = false;
+    const openAlarm = (alarmId: unknown) => {
+      if (typeof alarmId !== 'string') return;
+      const alarm = stateRef.current.alarms.find(candidate => candidate.id === alarmId && candidate.active);
+      if (alarm) activateAlarm(alarm);
+    };
+    const handleNativeAlarmOpen = (event: Event) => {
+      const detail = (event as CustomEvent<{ alarmId?: unknown }>).detail;
+      openAlarm(detail?.alarmId);
+      void GingAndroid.consumePendingAlarmTrigger().catch(error => {
+        console.warn('Could not clear the opened native alarm:', error);
+      });
+    };
+
+    window.addEventListener('ging:native-alarm-open', handleNativeAlarmOpen);
+    void GingAndroid.consumePendingAlarmTrigger()
+      .then(({ alarmId }) => {
+        if (!disposed) openAlarm(alarmId);
+      })
+      .catch(error => console.warn('Could not read the native alarm launch:', error));
+
+    return () => {
+      disposed = true;
+      window.removeEventListener('ging:native-alarm-open', handleNativeAlarmOpen);
     };
   }, [activateAlarm]);
 

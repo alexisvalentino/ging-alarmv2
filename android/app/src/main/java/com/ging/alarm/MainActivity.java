@@ -7,11 +7,13 @@ import android.os.Bundle;
 import android.os.PowerManager;
 import android.view.KeyEvent;
 import android.view.WindowManager;
+import org.json.JSONObject;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
 
     public static boolean isAlarmActive = false;
+    public static volatile String pendingAlarmTrigger = null;
     private static PowerManager.WakeLock cpuWakeLock = null;
 
     @Override
@@ -19,6 +21,7 @@ public class MainActivity extends BridgeActivity {
         // Register our custom standalone native permission, volume, and wake lock manager plugin BEFORE super.onCreate
         registerPlugin(GingAndroidPlugin.class);
         super.onCreate(savedInstanceState);
+        captureAlarmOpenIntent(getIntent());
 
         // Configure system flags to allow showing over lockscreen and keeping screen awake
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON |
@@ -28,6 +31,34 @@ public class MainActivity extends BridgeActivity {
                             
         // Always acquire persistent CPU wake lock to ensure JS timer evaluations run 24/7
         acquireCpuWakeLock();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        captureAlarmOpenIntent(intent);
+    }
+
+    private void captureAlarmOpenIntent(Intent intent) {
+        if (intent == null) return;
+        String alarmId = intent.getStringExtra(AlarmScheduler.EXTRA_ALARM_ID);
+        if (alarmId == null || alarmId.trim().isEmpty()) return;
+
+        pendingAlarmTrigger = alarmId;
+        if (getBridge() == null || getBridge().getWebView() == null) return;
+
+        String quotedId = JSONObject.quote(alarmId);
+        getBridge().getWebView().evaluateJavascript(
+            "window.dispatchEvent(new CustomEvent('ging:native-alarm-open',{detail:{alarmId:" + quotedId + "}}));",
+            null
+        );
+    }
+
+    public static String consumePendingAlarmTrigger() {
+        String alarmId = pendingAlarmTrigger;
+        pendingAlarmTrigger = null;
+        return alarmId;
     }
 
     @Override
@@ -106,14 +137,17 @@ public class MainActivity extends BridgeActivity {
             AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
             if (audioManager == null) return;
 
-            int currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
-            int maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-            if (currentVolume < maxVolume) {
-                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVolume, 0);
-            }
+            restoreStreamVolume(audioManager, AudioManager.STREAM_MUSIC);
+            restoreStreamVolume(audioManager, AudioManager.STREAM_ALARM);
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private static void restoreStreamVolume(AudioManager audioManager, int stream) {
+        int currentVolume = audioManager.getStreamVolume(stream);
+        int maxVolume = audioManager.getStreamMaxVolume(stream);
+        if (currentVolume < maxVolume) audioManager.setStreamVolume(stream, maxVolume, 0);
     }
 
     private void releaseCpuWakeLock() {
