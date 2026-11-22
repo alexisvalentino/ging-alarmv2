@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import jsQR from 'jsqr';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import {
   CheckCircle, RefreshCw, Ban
 } from 'lucide-react';
@@ -14,6 +14,7 @@ import { gingAudio } from '../utils/audio';
 import { matchesWakeUpCode } from '../utils/qrValidation';
 import { Capacitor } from '@capacitor/core';
 import { GingAndroid } from '../native/GingAndroid';
+import { successHaptic } from '../utils/haptics';
 
 interface AlarmRingerProps {
   alarm: Alarm;
@@ -32,10 +33,10 @@ const ALARM_OFF_SPARKS = [
 ];
 
 export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
-  const [scanStatus, setScanStatus] = useState<'scanning' | 'wrong-code' | 'authenticated'>('scanning');
-  const scanStatusRef = useRef<'scanning' | 'wrong-code' | 'authenticated'>('scanning');
+  const [scanStatus, setScanStatus] = useState<'scanning' | 'wrong-code' | 'stopping' | 'stop-error' | 'authenticated'>('scanning');
+  const scanStatusRef = useRef<'scanning' | 'wrong-code' | 'stopping' | 'stop-error' | 'authenticated'>('scanning');
 
-  const updateScanStatus = (status: 'scanning' | 'wrong-code' | 'authenticated') => {
+  const updateScanStatus = (status: 'scanning' | 'wrong-code' | 'stopping' | 'stop-error' | 'authenticated') => {
     setScanStatus(status);
     scanStatusRef.current = status;
   };
@@ -53,10 +54,12 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
   const lastScanAtRef = useRef(0);
   const dismissTimerRef = useRef<number | null>(null);
   const wrongCodeTimerRef = useRef<number | null>(null);
+  const nativeAlarmStoppedRef = useRef(false);
 
   // Start the alarm audio and enable strict native alarm behavior.
   useEffect(() => {
     const isNativeAndroid = Capacitor.getPlatform() === 'android';
+    nativeAlarmStoppedRef.current = !isNativeAndroid;
 
     // Android's foreground ringing service owns playback so the alarm keeps
     // sounding even when the WebView is backgrounded or the app is closed.
@@ -82,7 +85,7 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
       stopCamera();
 
       // Release native lock when alarm is successfully dismissed
-      if (isNativeAndroid) {
+      if (isNativeAndroid && !nativeAlarmStoppedRef.current) {
         GingAndroid.setAlarmActive({ active: false }).catch(err => console.error(err));
       }
     };
@@ -182,8 +185,43 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
     if (isMountedRef.current) setErrorText(message);
   };
 
+  const stopAlarmAfterSuccessfulScan = async () => {
+    updateScanStatus('stopping');
+    setErrorText(null);
+    stopCamera();
+    gingAudio.stop();
+    try {
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    } catch (error) {
+      console.warn('Could not cancel the alarm confirmation audio:', error);
+    }
+
+    try {
+      if (Capacitor.getPlatform() === 'android' && !nativeAlarmStoppedRef.current) {
+        // Android resolves this only after the native ringer service and its
+        // foreground notification have stopped completely.
+        await GingAndroid.setAlarmActive({ active: false });
+        nativeAlarmStoppedRef.current = true;
+      }
+
+      updateScanStatus('authenticated');
+      void successHaptic();
+      dismissTimerRef.current = window.setTimeout(() => {
+        onDismiss();
+        dismissTimerRef.current = null;
+      }, 2400);
+    } catch (error) {
+      console.error('The alarm did not confirm that it stopped:', error);
+      setErrorText('Ging could not confirm that the alarm stopped. Try again.');
+      updateScanStatus('stop-error');
+    }
+  };
+
   const scheduleScanFrame = () => {
-    if (!isMountedRef.current || !mediaStreamRef.current || loopRef.current !== null || scanStatusRef.current === 'authenticated') return;
+    if (!isMountedRef.current || !mediaStreamRef.current || loopRef.current !== null
+      || scanStatusRef.current === 'stopping'
+      || scanStatusRef.current === 'stop-error'
+      || scanStatusRef.current === 'authenticated') return;
     loopRef.current = requestAnimationFrame(qrScanTick);
   };
 
@@ -191,7 +229,9 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
   const qrScanTick = () => {
     loopRef.current = null;
     // If we've been authenticated, stop the loop permanently
-    if (!isMountedRef.current || scanStatusRef.current === 'authenticated') return;
+    if (!isMountedRef.current || scanStatusRef.current === 'stopping'
+      || scanStatusRef.current === 'stop-error'
+      || scanStatusRef.current === 'authenticated') return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -241,28 +281,7 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
         if (code) {
           if (matchesWakeUpCode(code.data, alarm.qrSecret)) {
             // CORRECT QR CODE MATCHED!
-            updateScanStatus('authenticated');
-            stopCamera();
-
-            // Sound off!
-            gingAudio.stop();
-
-            // Play a short voice confirmation if speech synthesis is available.
-            try {
-              if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
-                const authUtterance = new SpeechSynthesisUtterance("Alarm off.");
-                authUtterance.lang = 'en-US';
-                authUtterance.volume = 1.0;
-                window.speechSynthesis.speak(authUtterance);
-              }
-            } catch (e) { }
-
-            // End the loop and trigger success callback to parent.
-            dismissTimerRef.current = window.setTimeout(() => {
-              onDismiss();
-              dismissTimerRef.current = null;
-            }, 2400);
+            void stopAlarmAfterSuccessfulScan();
             return;
           } else {
             // Any other QR payload leaves the alarm active and resumes scanning shortly.
@@ -365,9 +384,9 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
           </span>
         </div>
         {scanStatus !== 'authenticated' && (
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium glass-badge-red">
-            <span className="w-1.5 h-1.5 rounded-full soft-pulse bg-ging-red" />
-            <span>Ringing</span>
+          <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-medium ${scanStatus === 'stopping' ? 'glass-badge-orange' : 'glass-badge-red'}`}>
+            <span className={`w-1.5 h-1.5 rounded-full soft-pulse ${scanStatus === 'stopping' ? 'bg-ging-orange' : 'bg-ging-red'}`} />
+            <span>{scanStatus === 'stopping' ? 'Stopping…' : 'Ringing'}</span>
           </div>
         )}
       </div>
@@ -377,7 +396,7 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
         {/* Camera viewport — always mounted so the stream is never disconnected */}
         <div className="relative glass-card rounded-3xl overflow-hidden ringing-camera">
           <div className="aspect-[4/5] relative bg-black ringing-camera-view">
-            {!isCameraActive && !errorText && (
+            {!isCameraActive && !errorText && scanStatus !== 'stopping' && (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-500 gap-3 p-4 text-center z-10 camera-loading">
                 <RefreshCw className="w-8 h-8 animate-spin text-zinc-400" />
                 <span className="text-[13px] text-zinc-400 font-medium">Starting camera…</span>
@@ -392,10 +411,12 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
                 <span className="text-[13px] text-zinc-300 leading-relaxed font-medium">{errorText}</span>
 
                 <button
-                  onClick={() => void startCamera()}
+                  onClick={() => scanStatus === 'stop-error'
+                    ? void stopAlarmAfterSuccessfulScan()
+                    : void startCamera()}
                   className="w-full max-w-xs text-[14px] glass-button font-medium py-3 rounded-xl transition-transform active:scale-95 mt-1"
                 >
-                  Retry camera
+                  {scanStatus === 'stop-error' ? 'Retry stopping' : 'Retry camera'}
                 </button>
               </div>
             )}
@@ -408,55 +429,51 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
               muted
             />
 
-            {/* Scanner overlay — minimal: corners + scan line only */}
-            {isCameraActive && scanStatus === 'scanning' && (
-              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                <div className="w-56 h-56 relative">
-                  {/* Animated scan line — theme token, no glow */}
-                  <div className="absolute inset-x-2 h-0.5 bg-ging-orange scan-line rounded-full" />
-                  {/* L-shaped corner brackets */}
-                  <div className="absolute -top-px -left-px w-7 h-7 border-t-2 border-l-2 border-ging-orange rounded-tl-xl" />
-                  <div className="absolute -top-px -right-px w-7 h-7 border-t-2 border-r-2 border-ging-orange rounded-tr-xl" />
-                  <div className="absolute -bottom-px -left-px w-7 h-7 border-b-2 border-l-2 border-ging-orange rounded-bl-xl" />
-                  <div className="absolute -bottom-px -right-px w-7 h-7 border-b-2 border-r-2 border-ging-orange rounded-br-xl" />
+            {scanStatus === 'stopping' && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/25" role="status" aria-live="polite">
+                <div className="glass-card flex items-center gap-3 px-5 py-4 rounded-2xl">
+                  <RefreshCw className="w-5 h-5 animate-spin text-ging-orange" />
+                  <span className="text-[14px] font-medium">Stopping alarm…</span>
                 </div>
               </div>
             )}
 
-            {/* Keep a short wrong-code response over the live camera. */}
-            <AnimatePresence mode="wait">
-              {scanStatus === 'wrong-code' && (
-                <motion.div
-                  key="wrong-code"
-                  initial={{ opacity: 0, scale: 0.94 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.94 }}
-                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                  className="absolute inset-0 z-30 flex items-center justify-center bg-black/50"
-                >
-                  <div className="glass-card border-red-500/25 p-6 text-center w-[80%] rounded-2xl">
-                    <div className="w-12 h-12 rounded-full bg-red-500/15 border border-red-500/25 flex items-center justify-center mx-auto mb-3 text-red-300">
-                      <Ban className="w-7 h-7" />
-                    </div>
-                    <h3 className="text-[17px] font-semibold text-white">Wrong code</h3>
-                    <p className="text-[13px] text-zinc-400 mt-1.5">
-                      Scan the QR code for this alarm.
-                    </p>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {/* Keep the live scan guide visible during brief wrong-code feedback. */}
+            {isCameraActive && (scanStatus === 'scanning' || scanStatus === 'wrong-code') && (
+              <div className={`scanner-overlay absolute inset-0 pointer-events-none flex items-center justify-center ${scanStatus === 'wrong-code' ? 'scanner-overlay--error' : ''}`}>
+                <div className="w-56 h-56 relative">
+                  <div className="scanner-line absolute inset-x-2 h-0.5 scan-line rounded-full" />
+                  <div className="scanner-corner absolute -top-px -left-px w-7 h-7 border-t-2 border-l-2 rounded-tl-xl" />
+                  <div className="scanner-corner absolute -top-px -right-px w-7 h-7 border-t-2 border-r-2 rounded-tr-xl" />
+                  <div className="scanner-corner absolute -bottom-px -left-px w-7 h-7 border-b-2 border-l-2 rounded-bl-xl" />
+                  <div className="scanner-corner absolute -bottom-px -right-px w-7 h-7 border-b-2 border-r-2 rounded-br-xl" />
+                </div>
+              </div>
+            )}
+
           </div>
 
           {/* Keep camera diagnostics out of the alarm UI; the task is simply to scan. */}
           {scanStatus !== 'authenticated' && (isCameraActive || errorText) && (
-            <div className="px-4 py-3 flex justify-center items-center text-[13px] border-t border-[rgba(164,62,0,0.1)]" role="status" aria-live="polite">
-              <span className={`inline-flex items-center gap-2 font-medium ${errorText || scanStatus === 'wrong-code' ? 'text-red-400' : 'text-ging-burnt'}`}>
-                {!errorText && isCameraActive && scanStatus === 'scanning' && (
-                  <span className="w-2 h-2 rounded-full soft-pulse bg-ging-orange" aria-hidden="true" />
-                )}
-                {errorText ? 'Camera unavailable' : scanStatus === 'wrong-code' ? 'Retrying' : 'Scanning'}
-              </span>
+            <div className={`scanner-camera-status ${scanStatus === 'wrong-code' ? 'scanner-camera-status--error' : ''}`} role="status" aria-live="polite">
+              {scanStatus === 'wrong-code' ? (
+                <div className="scanner-error-feedback">
+                  <span className="scanner-error-icon" aria-hidden="true"><Ban className="w-4 h-4" /></span>
+                  <span className="scanner-error-copy">
+                    <strong>Wrong QR code</strong>
+                    <span>Keep this alarm&apos;s code in view.</span>
+                  </span>
+                </div>
+              ) : (
+                <span className={`inline-flex items-center gap-2 font-medium ${errorText ? 'text-red-400' : 'text-ging-burnt'}`}>
+                  {!errorText && isCameraActive && scanStatus === 'scanning' && (
+                    <span className="w-2 h-2 rounded-full soft-pulse bg-ging-orange" aria-hidden="true" />
+                  )}
+                  {errorText
+                    ? scanStatus === 'stop-error' ? 'Alarm still ringing' : 'Camera unavailable'
+                    : scanStatus === 'stopping' ? 'Stopping alarm' : 'Scanning'}
+                </span>
+              )}
             </div>
           )}
         </div>

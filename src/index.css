@@ -43,6 +43,94 @@
   animation: scan 2.8s infinite ease-in-out;
 }
 
+.scanner-overlay {
+  color: var(--ging-primary);
+}
+
+.scanner-overlay--error {
+  color: var(--ging-error);
+}
+
+.scanner-line {
+  background: currentColor;
+}
+
+.scanner-corner {
+  border-color: currentColor;
+}
+
+.scanner-overlay--error .scanner-corner {
+  animation: scanner-error-pulse 900ms ease-in-out 2;
+}
+
+.scanner-camera-status {
+  min-height: 52px;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-top: 1px solid rgba(164, 62, 0, 0.1);
+  color: var(--ging-primary);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.scanner-camera-status--error {
+  min-height: 64px;
+  background: linear-gradient(180deg, rgba(255, 250, 248, 0.72), rgba(255, 239, 236, 0.9));
+}
+
+.scanner-error-feedback {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  animation: scanner-feedback-in 180ms ease-out both;
+}
+
+.scanner-error-icon {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(186, 26, 26, 0.16);
+  border-radius: 50%;
+  color: var(--ging-error);
+  background: rgba(255, 218, 214, 0.64);
+}
+
+.scanner-error-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  color: var(--ging-error);
+}
+
+.scanner-error-copy strong {
+  font-size: 0.8125rem;
+  font-weight: 650;
+  line-height: 1.125rem;
+}
+
+.scanner-error-copy span {
+  color: var(--ging-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+@keyframes scanner-error-pulse {
+  0%, 100% { opacity: 0.66; }
+  50% { opacity: 1; }
+}
+
+@keyframes scanner-feedback-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @keyframes scan {
   0% { top: 8%; opacity: 0.4; }
   50% { top: 92%; opacity: 1; }

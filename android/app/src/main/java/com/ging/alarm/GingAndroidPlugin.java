@@ -46,8 +46,11 @@ public class GingAndroidPlugin extends Plugin {
                 }
             });
         } else {
-            MainActivity.isAlarmActive = false;
-            AlarmRingingService.stop(getContext());
+            AlarmRingingService.stop(getContext(), () -> {
+                MainActivity.isAlarmActive = false;
+                call.resolve();
+            });
+            return;
         }
         call.resolve();
     }

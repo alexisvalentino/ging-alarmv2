@@ -21,6 +21,9 @@ import android.os.PowerManager;
 
 import androidx.core.content.ContextCompat;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class AlarmRingingService extends Service {
 
     public static final String ACTION_START = "com.ging.alarm.START_RINGING";
@@ -35,6 +38,7 @@ public class AlarmRingingService extends Service {
     private static final int NOTIFICATION_ID = 0x47494E47;
     private static final int SAMPLE_RATE = 44100;
     private static final int FRAMES_PER_WRITE = 1024;
+    private static final List<Runnable> stopCompletions = new ArrayList<>();
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private volatile boolean shouldRing;
@@ -61,12 +65,19 @@ public class AlarmRingingService extends Service {
         ContextCompat.startForegroundService(context, intent);
     }
 
-    public static void stop(Context context) {
+    public static void stop(Context context, Runnable onStopped) {
         context.getSharedPreferences(SERVICE_PREFERENCES, Context.MODE_PRIVATE)
             .edit()
             .clear()
             .apply();
-        context.stopService(new Intent(context, AlarmRingingService.class));
+        if (onStopped != null) {
+            synchronized (stopCompletions) {
+                stopCompletions.add(onStopped);
+            }
+        }
+        if (!context.stopService(new Intent(context, AlarmRingingService.class))) {
+            completeStopRequests();
+        }
     }
 
     @Override
@@ -132,6 +143,7 @@ public class AlarmRingingService extends Service {
         MainActivity.isAlarmActive = false;
         stopForeground(STOP_FOREGROUND_REMOVE);
         super.onDestroy();
+        completeStopRequests();
     }
 
     private void startForegroundCompat(Notification notification) {
@@ -280,7 +292,9 @@ public class AlarmRingingService extends Service {
     private synchronized void stopToneLoop() {
         shouldRing = false;
         AudioTrack track = audioTrack;
+        Thread thread = audioThread;
         audioTrack = null;
+        audioThread = null;
         if (track != null) {
             try {
                 track.pause();
@@ -291,7 +305,24 @@ public class AlarmRingingService extends Service {
             }
             track.release();
         }
-        audioThread = null;
+        if (thread != null && thread != Thread.currentThread()) {
+            thread.interrupt();
+            try {
+                thread.join(300);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    private static void completeStopRequests() {
+        List<Runnable> callbacks;
+        synchronized (stopCompletions) {
+            if (stopCompletions.isEmpty()) return;
+            callbacks = new ArrayList<>(stopCompletions);
+            stopCompletions.clear();
+        }
+        for (Runnable callback : callbacks) callback.run();
     }
 
     private void setMaximumAlarmVolume() {
