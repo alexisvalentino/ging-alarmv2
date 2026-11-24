@@ -634,29 +634,31 @@ body {
 }
 
 .qr-code-stage {
+  --qr-code-size: 224px;
+  --qr-frame-padding: 12px;
   container-type: inline-size;
   display: flex;
   width: 100%;
   align-items: center;
   justify-content: center;
-  padding: clamp(14px, 4vw, 24px);
-  border: 1px solid rgba(164, 62, 0, 0.09);
-  border-radius: 30px;
-  background: linear-gradient(145deg, rgba(255, 241, 236, 0.76), rgba(255, 248, 246, 0.58));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
-  -webkit-backdrop-filter: blur(18px) saturate(142%);
-  backdrop-filter: blur(18px) saturate(142%);
+  min-width: 0;
+  padding: 0;
 }
 
 .qr-code-frame {
-  padding: 12px;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: min(calc(var(--qr-code-size) + var(--qr-frame-padding) + var(--qr-frame-padding)), 100%);
+  aspect-ratio: 1;
+  padding: var(--qr-frame-padding);
   border-radius: 24px;
   background: #FFFFFF;
   box-shadow: 0 16px 34px -18px rgba(61, 45, 38, 0.34);
 }
 
 .qr-code-canvas {
-  width: min(224px, calc(100cqi - 48px)) !important;
+  width: min(var(--qr-code-size), calc(100cqi - var(--qr-frame-padding) - var(--qr-frame-padding))) !important;
   height: auto !important;
   aspect-ratio: 1;
   max-width: 100%;
@@ -1240,12 +1242,7 @@ body {
   }
 
   .qr-code-stage {
-    padding: 10px;
-    border-radius: 24px;
-  }
-
-  .qr-code-frame {
-    padding: 10px;
+    --qr-frame-padding: 10px;
   }
 
   .ging-screen--qr .qr-footer {
@@ -1287,17 +1284,8 @@ body {
   }
 
   .ging-screen--qr .qr-code-stage {
-    padding: 8px;
-    border-radius: 22px;
-  }
-
-  .qr-code-frame {
-    padding: 8px;
-  }
-
-  .ging-screen--qr .qr-code-canvas {
-    width: min(24vw, 180px) !important;
-    height: min(24vw, 180px) !important;
+    --qr-code-size: min(24vw, 180px);
+    --qr-frame-padding: 8px;
   }
 
   .qr-action {
@@ -1434,9 +1422,8 @@ body {
     margin-top: 0;
   }
 
-  .qr-code-canvas {
-    width: min(280px, calc(100cqi - 48px)) !important;
-    height: auto !important;
+  .qr-code-stage {
+    --qr-code-size: 280px;
   }
 
   .alarm-sheet {
@@ -1745,17 +1732,12 @@ body {
   }
 
   .qr-code-stage {
-    padding-block: 12px;
+    --qr-code-size: min(30vw, 280px);
   }
 
   .qr-mascot {
     width: 96px;
     height: 96px;
-  }
-
-  .qr-code-canvas {
-    width: min(30vw, 280px) !important;
-    height: min(30vw, 280px) !important;
   }
 
   .ringing-header,
@@ -1931,13 +1913,9 @@ body {
   }
 
   .ging-screen--qr .qr-code-stage {
+    --qr-code-size: min(224px, calc(var(--ging-segment-start) - 48px));
     grid-column: 1;
     grid-row: 1 / span 3;
-  }
-
-  .ging-screen--qr .qr-code-canvas {
-    width: min(224px, calc(var(--ging-segment-start) - 48px)) !important;
-    height: auto !important;
   }
 
   .ging-screen--qr .qr-actions {

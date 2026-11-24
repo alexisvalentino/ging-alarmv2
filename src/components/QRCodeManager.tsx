@@ -310,7 +310,7 @@ export default function QRCodeManager({ userQRSecret, hasAlarms, onRegenerateSec
       {/* Main content */}
       <div className="flex-1 max-w-md w-full mx-auto flex flex-col items-center z-10 mt-6 space-y-6 qr-content">
 
-        {/* The warm stage blends into the app palette while the code stays easy to scan. */}
+        {/* Keep the code on a clean square surface for reliable scanning. */}
         <div className="qr-code-stage">
           <div className="qr-code-frame relative">
             {isGenerating && (
