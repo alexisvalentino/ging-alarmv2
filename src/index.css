@@ -53,6 +53,7 @@
 
 .scanner-frame {
   width: min(46vw, 14rem);
+  width: clamp(144px, 46cqi, 14rem);
   aspect-ratio: 1;
 }
 
@@ -197,7 +198,8 @@ html {
 
 body {
   margin: 0;
-  min-width: 320px;
+  min-inline-size: 0;
+  overflow-x: clip;
   background: var(--ging-bg);
   color: var(--ging-ink);
   font-family: var(--font-sans);
@@ -205,6 +207,10 @@ body {
 
 .ging-app {
   min-height: 100dvh;
+  min-width: 0;
+  width: 100%;
+  container-name: ging-app;
+  container-type: inline-size;
   background: var(--ging-bg);
   color: var(--ging-ink);
   isolation: isolate;
@@ -213,6 +219,8 @@ body {
 .ging-screen {
   box-sizing: border-box;
   min-height: 100dvh;
+  min-width: 0;
+  width: 100%;
   padding-block-start: max(20px, env(safe-area-inset-top));
   padding-block-end: max(24px, env(safe-area-inset-bottom));
   padding-inline: max(20px, env(safe-area-inset-left)) max(20px, env(safe-area-inset-right));
@@ -410,6 +418,37 @@ body {
   transform: translateX(20px);
 }
 
+.ging-app[data-platform="android"] .ios-toggle {
+  width: 56px;
+}
+
+.ging-app[data-platform="android"] .ios-toggle::before {
+  inset-inline: 2px;
+  top: 11px;
+  height: 26px;
+  border: 2px solid #76594E;
+  background: #FFF1EC;
+}
+
+.ging-app[data-platform="android"] .ios-toggle.is-on::before {
+  border-color: var(--ging-primary);
+  background: var(--ging-primary);
+}
+
+.ging-app[data-platform="android"] .ios-toggle__knob {
+  top: 15px;
+  left: 6px;
+  width: 18px;
+  height: 18px;
+  background: #76594E;
+  box-shadow: none;
+}
+
+.ging-app[data-platform="android"] .ios-toggle.is-on .ios-toggle__knob {
+  transform: translateX(24px);
+  background: #FFFFFF;
+}
+
 .ging-app [class~="text-white"] {
   color: var(--ging-ink) !important;
 }
@@ -595,6 +634,7 @@ body {
 }
 
 .qr-code-stage {
+  container-type: inline-size;
   display: flex;
   width: 100%;
   align-items: center;
@@ -616,8 +656,9 @@ body {
 }
 
 .qr-code-canvas {
-  width: min(58vw, 224px) !important;
-  height: min(58vw, 224px) !important;
+  width: min(224px, calc(100cqi - 48px)) !important;
+  height: auto !important;
+  aspect-ratio: 1;
   max-width: 100%;
   image-rendering: pixelated;
 }
@@ -656,6 +697,26 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.98),
     inset 0 -1px 0 rgba(164, 62, 0, 0.04),
     0 12px 24px -18px rgba(164, 62, 0, 0.36);
+}
+
+.native-time-input {
+  box-sizing: border-box;
+  width: min(100%, 18rem);
+  min-height: 72px;
+  padding: 12px 16px;
+  border: 1px solid rgba(164, 62, 0, 0.16);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--ging-ink);
+  font: 600 28px/1.2 var(--font-sans);
+  text-align: center;
+  color-scheme: light;
+  accent-color: var(--ging-primary);
+}
+
+.native-time-input:focus-visible {
+  outline: 3px solid rgba(164, 62, 0, 0.42);
+  outline-offset: 3px;
 }
 
 .time-wheel-column {
@@ -1069,6 +1130,7 @@ body {
 }
 
 .ringing-camera-view {
+  container-type: inline-size;
   width: 100%;
   min-height: 0;
   flex: 1;
@@ -1081,6 +1143,13 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.ringing-scan-hint {
+  display: none;
+  color: var(--ging-muted);
+  font-size: 15px;
+  line-height: 1.5;
 }
 
 .repeat-picker button {
@@ -1241,7 +1310,274 @@ body {
   }
 }
 
-@media (min-width: 768px) {
+@container ging-app (min-width: 640px) {
+  .permissions-header,
+  .permissions-main,
+  .permissions-footer {
+    width: 100%;
+    max-width: min(100%, 960px) !important;
+  }
+
+  .permissions-rows {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    overflow: visible;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .permissions-rows > .permission-row {
+    overflow: hidden;
+    border: 0;
+    border-radius: 20px;
+    background: var(--ging-glass-fill);
+    -webkit-backdrop-filter: var(--ging-glass-filter);
+    backdrop-filter: var(--ging-glass-filter);
+    box-shadow: var(--ging-glass-shadow);
+  }
+
+  .permissions-rows > .permission-row:not(:last-child) {
+    border-bottom-width: 1px;
+  }
+
+  .permissions-rows > .permission-row {
+    border-top-width: 0 !important;
+  }
+
+  .dashboard-header,
+  .dashboard-list {
+    width: 100%;
+    max-width: min(100%, 1040px) !important;
+  }
+
+  .dashboard-header {
+    padding-inline: clamp(24px, 4cqi, 48px);
+  }
+
+  .dashboard-heading {
+    min-height: 120px;
+  }
+
+  .dashboard-heading--empty {
+    min-height: 64px;
+  }
+
+  .dashboard-title {
+    font-size: clamp(32px, 4cqi, 42px);
+  }
+
+  .dashboard-mascot {
+    width: clamp(112px, 14cqi, 148px);
+    height: clamp(112px, 14cqi, 148px);
+  }
+
+  .dashboard-list {
+    padding-inline: clamp(24px, 4cqi, 48px);
+    padding-bottom: max(28px, env(safe-area-inset-bottom));
+  }
+
+  .dashboard-alarms {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    overflow: visible;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .dashboard-alarms > .dashboard-alarm-row {
+    min-width: 0;
+    padding: 18px;
+    border: 0;
+    border-radius: 22px;
+    background: var(--ging-glass-fill);
+    -webkit-backdrop-filter: var(--ging-glass-filter);
+    backdrop-filter: var(--ging-glass-filter);
+    box-shadow: var(--ging-glass-shadow);
+  }
+
+  .dashboard-alarms > .dashboard-alarm-row:not(:last-child) {
+    border-bottom-width: 1px;
+  }
+
+  .dashboard-alarms > .dashboard-alarm-row {
+    border-top-width: 0 !important;
+  }
+
+  .dashboard-alarms--single > .dashboard-alarm-row {
+    grid-column: 1 / -1;
+    width: min(100%, 600px);
+    justify-self: center;
+  }
+
+  .qr-header,
+  .qr-footer {
+    width: 100%;
+    max-width: min(100%, 960px) !important;
+  }
+
+  .qr-content {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    align-items: start;
+    align-content: center;
+    gap: 20px;
+    width: 100%;
+    max-width: min(100%, 960px);
+    margin-inline: auto;
+  }
+
+  .qr-content > :not(:first-child) {
+    margin-top: 0;
+  }
+
+  .qr-code-canvas {
+    width: min(280px, calc(100cqi - 48px)) !important;
+    height: auto !important;
+  }
+
+  .alarm-sheet {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: min(760px, calc(100cqi - 48px));
+    height: fit-content;
+    max-width: 760px !important;
+    max-height: min(88dvh, 900px);
+    margin: auto;
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    border-radius: 28px;
+  }
+
+  .alarm-sheet > .sticky {
+    display: none;
+  }
+
+  .alarm-sheet .alarm-form {
+    display: grid;
+    grid-template-areas:
+      "time label"
+      "time sound"
+      "repeat repeat"
+      "submit submit";
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px 22px;
+  }
+
+  .alarm-sheet .alarm-form > * {
+    margin: 0 !important;
+  }
+
+  .alarm-time-field {
+    grid-area: time;
+    min-width: 0;
+    min-height: 100%;
+    align-items: center;
+  }
+
+  .alarm-label-field {
+    grid-area: label;
+    min-width: 0;
+  }
+
+  .alarm-sound-field {
+    grid-area: sound;
+    min-width: 0;
+  }
+
+  .alarm-repeat-field {
+    grid-area: repeat;
+  }
+
+  .alarm-sheet .alarm-submit {
+    grid-area: submit;
+  }
+
+  .alarm-sheet .sound-options {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .alarm-sheet .sound-option {
+    min-height: 60px;
+  }
+
+  .alarm-sheet .sound-option-select {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 9px 61px 9px 11px;
+  }
+
+  .ringing-header,
+  .ringing-main {
+    width: 100%;
+    max-width: min(100%, 1080px) !important;
+  }
+
+  .ringing-main {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr);
+    align-items: center;
+    align-content: center;
+    gap: clamp(20px, 4cqi, 48px);
+    padding-block: 12px;
+  }
+
+  .ringing-camera-stack {
+    display: contents;
+  }
+
+  .ringing-camera {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    min-height: min(62dvh, 680px);
+    flex: none;
+  }
+
+  .ringing-camera-view {
+    aspect-ratio: auto;
+    max-height: none;
+  }
+
+  .ringing-scan-hint {
+    display: block;
+    grid-column: 2;
+    grid-row: 1;
+    max-width: 28ch;
+    margin: 0;
+    font-size: clamp(17px, 2.1cqi, 22px);
+  }
+
+  .ringing-main .scanner-camera-status {
+    grid-column: 2;
+    grid-row: 2;
+    width: 100%;
+    align-self: start;
+  }
+
+  .scanner-camera-status--error {
+    min-height: 84px;
+    padding: 12px 16px;
+  }
+
+  .scanner-error-icon {
+    width: 42px;
+    height: 42px;
+  }
+
+  .ringing-mascot {
+    width: 64px;
+    height: 64px;
+  }
+}
+
+@container ging-app (min-width: 768px) {
   .ging-screen--splash {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(280px, 0.8fr);
@@ -1390,13 +1726,13 @@ body {
   }
 
   .alarm-sheet {
-    width: min(calc(100vw - 48px), 600px);
+    width: min(calc(100cqi - 48px), 600px);
     max-width: 600px !important;
   }
 
   .qr-content {
     display: grid;
-    grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1.1fr);
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
     align-items: start;
     align-content: center;
     gap: 24px;
@@ -1424,22 +1760,20 @@ body {
 
   .ringing-header,
   .ringing-main {
-    max-width: min(100%, 680px) !important;
+    max-width: min(100%, 1080px) !important;
   }
 
   .ringing-main {
-    display: flex;
-    flex-direction: column;
-    align-content: stretch;
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr);
     align-items: center;
-    justify-content: flex-start;
-    gap: 0;
+    align-content: center;
+    gap: clamp(20px, 4cqi, 48px);
     padding-block: 12px;
   }
 
   .ringing-camera-stack {
-    min-height: 0;
-    flex: 1;
+    display: contents;
   }
 
   .ringing-main > * {
@@ -1469,6 +1803,312 @@ body {
   .ringing-mascot {
     width: 64px;
     height: 64px;
+  }
+}
+
+@container ging-app (min-width: 1200px) {
+  .dashboard-header,
+  .dashboard-list {
+    max-width: min(100%, 1200px) !important;
+  }
+
+  .dashboard-alarms {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container ging-app (min-width: 640px) and (max-width: 767px) {
+  .alarm-sheet .sound-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .ging-screen {
+    padding-block-start: max(12px, env(safe-area-inset-top));
+    padding-block-end: max(12px, env(safe-area-inset-bottom));
+  }
+
+  .dashboard-heading {
+    min-height: 78px;
+  }
+
+  .dashboard-mascot {
+    width: 84px;
+    height: 84px;
+  }
+
+  .ging-screen--permissions {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .ringing-main {
+    gap: 18px;
+    padding-block: 4px;
+  }
+
+  .ringing-camera {
+    min-height: min(54dvh, 420px);
+  }
+
+  .alarm-sheet {
+    max-height: min(94dvh, 760px);
+  }
+}
+
+@media (horizontal-viewport-segments: 2) {
+  .ging-screen--dashboard {
+    --ging-segment-start: calc(env(viewport-segment-width 0 0) - max(20px, env(safe-area-inset-left)));
+    --ging-segment-end: calc(env(viewport-segment-width 1 0) - max(20px, env(safe-area-inset-right)));
+    --ging-segment-gutter: calc(env(viewport-segment-left 1 0) - env(viewport-segment-right 0 0));
+    display: grid;
+    height: 100dvh;
+    grid-template-columns: minmax(0, var(--ging-segment-start)) minmax(0, var(--ging-segment-end));
+    grid-template-rows: minmax(0, 1fr);
+    column-gap: var(--ging-segment-gutter);
+  }
+
+  .ging-screen--dashboard .dashboard-header {
+    grid-column: 1;
+    grid-row: 1;
+    width: 100%;
+    max-width: none !important;
+    align-self: center;
+    padding-inline: max(20px, env(safe-area-inset-left)) 24px;
+  }
+
+  .ging-screen--dashboard .dashboard-list {
+    grid-column: 2;
+    grid-row: 1;
+    width: 100%;
+    max-width: none !important;
+    min-height: 0;
+    max-height: 100%;
+    align-self: stretch;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    margin: 0;
+    padding: 24px max(20px, env(safe-area-inset-right)) 24px 24px;
+  }
+
+  .ging-screen--dashboard .dashboard-alarms {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ging-screen--qr {
+    --ging-segment-start: calc(env(viewport-segment-width 0 0) - max(20px, env(safe-area-inset-left)));
+    --ging-segment-end: calc(env(viewport-segment-width 1 0) - max(20px, env(safe-area-inset-right)));
+    --ging-segment-gutter: calc(env(viewport-segment-left 1 0) - env(viewport-segment-right 0 0));
+    display: grid;
+    grid-template-columns: minmax(0, var(--ging-segment-start)) minmax(0, var(--ging-segment-end));
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    column-gap: var(--ging-segment-gutter);
+    row-gap: 16px;
+    align-items: center;
+  }
+
+  .ging-screen--qr .qr-header,
+  .ging-screen--qr .qr-content {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: none !important;
+    margin: 0;
+  }
+
+  .ging-screen--qr .qr-header {
+    grid-row: 1;
+  }
+
+  .ging-screen--qr .qr-content {
+    grid-row: 2;
+    grid-template-columns: minmax(0, var(--ging-segment-start)) minmax(0, var(--ging-segment-end));
+    grid-template-rows: minmax(0, 1fr) auto auto;
+    column-gap: var(--ging-segment-gutter);
+    row-gap: 12px;
+    align-items: center;
+  }
+
+  .ging-screen--qr .qr-code-stage {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+  }
+
+  .ging-screen--qr .qr-code-canvas {
+    width: min(224px, calc(var(--ging-segment-start) - 48px)) !important;
+    height: auto !important;
+  }
+
+  .ging-screen--qr .qr-actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .ging-screen--qr .qr-feedback {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .ging-screen--qr .qr-error {
+    grid-column: 2;
+    grid-row: 3;
+  }
+
+  .ging-screen--qr .qr-footer {
+    grid-column: 2;
+    grid-row: 3;
+    width: 100%;
+    max-width: none !important;
+    margin: 0;
+  }
+
+  .ging-screen--ringing {
+    --ging-segment-start: calc(env(viewport-segment-width 0 0) - max(20px, env(safe-area-inset-left)));
+    --ging-segment-end: calc(env(viewport-segment-width 1 0) - max(20px, env(safe-area-inset-right)));
+    --ging-segment-gutter: calc(env(viewport-segment-left 1 0) - env(viewport-segment-right 0 0));
+    display: grid;
+    grid-template-columns: minmax(0, var(--ging-segment-start)) minmax(0, var(--ging-segment-end));
+    grid-template-rows: auto minmax(0, 1fr);
+    column-gap: var(--ging-segment-gutter);
+    row-gap: 8px;
+  }
+
+  .ging-screen--ringing .ringing-header,
+  .ging-screen--ringing .ringing-main {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: none !important;
+  }
+
+  .ging-screen--ringing .ringing-header {
+    grid-row: 1;
+    padding-inline: max(20px, env(safe-area-inset-left)) max(20px, env(safe-area-inset-right));
+  }
+
+  .ging-screen--ringing .ringing-main {
+    grid-row: 2;
+    grid-template-columns: minmax(0, var(--ging-segment-start)) minmax(0, var(--ging-segment-end));
+    column-gap: var(--ging-segment-gutter);
+    min-height: 0;
+  }
+
+  .ging-screen--ringing .ringing-camera {
+    min-height: min(70dvh, 680px);
+  }
+
+  .alarm-sheet {
+    left: calc(env(viewport-segment-left 1 0) + 16px);
+    right: auto;
+    width: min(calc(env(viewport-segment-width 1 0) - 32px), 600px);
+    max-width: 600px !important;
+    margin-inline: 0;
+  }
+}
+
+@media (vertical-viewport-segments: 2) {
+  .ging-screen--dashboard {
+    --ging-pane-start: calc(env(viewport-segment-height 0 0) - max(20px, env(safe-area-inset-top)));
+    --ging-pane-end: calc(env(viewport-segment-height 0 1) - max(24px, env(safe-area-inset-bottom)));
+    --ging-pane-gutter: calc(env(viewport-segment-top 0 1) - env(viewport-segment-bottom 0 0));
+    display: grid;
+    height: 100dvh;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, var(--ging-pane-start)) minmax(0, var(--ging-pane-end));
+    row-gap: var(--ging-pane-gutter);
+  }
+
+  .ging-screen--dashboard .dashboard-header {
+    grid-column: 1;
+    grid-row: 1;
+    width: 100%;
+    max-width: none !important;
+    align-self: center;
+    padding-inline: max(20px, env(safe-area-inset-left)) max(20px, env(safe-area-inset-right));
+  }
+
+  .ging-screen--dashboard .dashboard-list {
+    grid-column: 1;
+    grid-row: 2;
+    width: 100%;
+    max-width: none !important;
+    min-height: 0;
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    margin: 0;
+  }
+
+  .ging-screen--qr {
+    --ging-pane-start: calc(env(viewport-segment-height 0 0) - max(20px, env(safe-area-inset-top)));
+    --ging-pane-end: calc(env(viewport-segment-height 0 1) - max(24px, env(safe-area-inset-bottom)));
+    --ging-pane-gutter: calc(env(viewport-segment-top 0 1) - env(viewport-segment-bottom 0 0));
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, var(--ging-pane-start)) minmax(0, var(--ging-pane-end));
+    row-gap: var(--ging-pane-gutter);
+    align-items: stretch;
+  }
+
+  .ging-screen--qr .qr-header {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+    width: 100%;
+  }
+
+  .ging-screen--qr .qr-content {
+    grid-column: 1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+    align-content: center;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    max-width: none !important;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 76px;
+    margin: 0;
+  }
+
+  .ging-screen--qr .qr-footer {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: end;
+    justify-self: center;
+    width: min(100%, 380px);
+    max-width: none !important;
+    margin: 0;
+  }
+
+  .ging-screen--ringing {
+    --ging-pane-start: calc(env(viewport-segment-height 0 0) - max(20px, env(safe-area-inset-top)));
+    --ging-pane-end: calc(env(viewport-segment-height 0 1) - max(24px, env(safe-area-inset-bottom)));
+    --ging-pane-gutter: calc(env(viewport-segment-top 0 1) - env(viewport-segment-bottom 0 0));
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, var(--ging-pane-start)) minmax(0, var(--ging-pane-end));
+    row-gap: var(--ging-pane-gutter);
+  }
+
+  .ging-screen--ringing .ringing-header {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+    width: 100%;
+  }
+
+  .ging-screen--ringing .ringing-main {
+    grid-column: 1;
+    grid-row: 2;
+    width: 100%;
+    min-height: 0;
+  }
+
+  .ging-screen--ringing .ringing-camera {
+    min-height: min(48dvh, 500px);
   }
 }
 

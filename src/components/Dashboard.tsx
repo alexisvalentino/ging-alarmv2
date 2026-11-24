@@ -5,6 +5,7 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Capacitor } from '@capacitor/core';
 import {
   Plus, Play, Square, QrCode, X, Minus, Tag, Volume2
 } from 'lucide-react';
@@ -345,7 +346,8 @@ export default function Dashboard({
                   <button
                     onClick={() => onToggleAlarm(alarm.id)}
                     className={`ios-toggle ${alarm.active ? 'is-on' : 'is-off'} shrink-0`}
-                    aria-pressed={alarm.active}
+                    role="switch"
+                    aria-checked={alarm.active}
                     aria-label={`Toggle ${alarmLabel}`}
                   >
                     <span className="ios-toggle__knob" />
@@ -416,9 +418,19 @@ export default function Dashboard({
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4 alarm-form">
-                  {/* Time picker — iOS scroll wheel */}
-                  <div className="glass-card py-5 flex justify-center time-wheel-card">
-                    <TimeWheelPicker value={newTime} onChange={setNewTime} />
+                  {/* Keep iOS's wheel interaction and let Android open its native time picker. */}
+                  <div className="glass-card py-5 flex justify-center time-wheel-card alarm-time-field">
+                    {Capacitor.getPlatform() === 'android' ? (
+                      <input
+                        className="native-time-input"
+                        type="time"
+                        value={newTime ?? ''}
+                        onChange={event => setNewTime(event.target.value || null)}
+                        aria-label="Alarm time"
+                      />
+                    ) : (
+                      <TimeWheelPicker value={newTime} onChange={setNewTime} />
+                    )}
                   </div>
 
                   {/* Label */}
@@ -481,7 +493,7 @@ export default function Dashboard({
                   </div>
 
                   {/* Repeat */}
-                  <div>
+                  <div className="alarm-repeat-field">
                     <p id="alarm-repeat-label" className="block text-[12px] font-medium text-zinc-400 mb-2">Repeat</p>
                     <div className="flex justify-between gap-1 repeat-picker" role="group" aria-labelledby="alarm-repeat-label">
                       {daysLabels.map((label, dayIndex) => {
@@ -512,7 +524,7 @@ export default function Dashboard({
                     className={`w-full py-3.5 rounded-2xl font-sans font-semibold text-[15px] transition-colors ${newTime && newDays.length > 0
                         ? 'glass-button-glow cursor-pointer'
                         : 'bg-white/[0.04] text-zinc-500 border border-dashed border-white/[0.08] cursor-not-allowed'
-                      }`}
+                      } alarm-submit`}
                   >
                     {!newTime ? 'Choose a time' : newDays.length > 0 ? 'Save Alarm' : 'Select at least one day'}
                   </button>

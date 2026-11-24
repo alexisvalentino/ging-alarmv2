@@ -476,7 +476,7 @@ export default function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="ging-app min-h-dvh select-none">
+      <div className="ging-app min-h-dvh select-none" data-platform={Capacitor.getPlatform()}>
         <Suspense fallback={<StartupScreen />}>
           <AnimatePresence mode="wait" initial={false}>
             <motion.div

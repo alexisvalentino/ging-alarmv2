@@ -454,6 +454,10 @@ export default function AlarmRinger({ alarm, onDismiss }: AlarmRingerProps) {
             </div>
           </div>
 
+          <p className="ringing-scan-hint">
+            Center your wake-up code in the frame to stop this alarm.
+          </p>
+
           {/* Keep camera diagnostics out of the alarm UI; the task is simply to scan. */}
           {scanStatus !== 'authenticated' && (isCameraActive || errorText) && (
             <div className={`scanner-camera-status ${scanStatus === 'wrong-code' ? 'scanner-camera-status--error' : ''}`} role="status" aria-live="polite">

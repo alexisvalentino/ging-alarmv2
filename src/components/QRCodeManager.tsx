@@ -323,7 +323,7 @@ export default function QRCodeManager({ userQRSecret, hasAlarms, onRegenerateSec
         </div>
 
         {qrError && (
-          <div className="w-full rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-[13px] text-red-300" role="alert">
+          <div className="qr-error w-full rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-[13px] text-red-300" role="alert">
             {qrError}
           </div>
         )}
@@ -374,7 +374,7 @@ export default function QRCodeManager({ userQRSecret, hasAlarms, onRegenerateSec
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 16, opacity: 0 }}
               role={feedback.isError ? 'alert' : 'status'}
-              className={`w-full glass-card p-3.5 rounded-2xl text-[13px] flex items-start gap-2.5 font-medium ${feedback.isError ? 'border-red-500/25 text-red-300' : 'border-emerald-500/25 text-emerald-300'}`}
+              className={`qr-feedback w-full glass-card p-3.5 rounded-2xl text-[13px] flex items-start gap-2.5 font-medium ${feedback.isError ? 'border-red-500/25 text-red-300' : 'border-emerald-500/25 text-emerald-300'}`}
             >
               {feedback.isError
                 ? <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
