@@ -693,9 +693,9 @@ body {
 .qr-test-camera {
   position: relative;
   flex: 0 1 auto;
-  width: min(100%, 72dvh, 587px);
+  width: min(100%, 54dvh, 440px);
   min-height: 180px;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 1;
   margin-block: auto;
   margin-inline: auto;
   overflow: hidden;
@@ -708,7 +708,7 @@ body {
 }
 
 .qr-test-scan-frame {
-  width: min(68vw, 16rem);
+  width: min(78vw, 18rem);
   aspect-ratio: 1;
 }
 
@@ -735,7 +735,7 @@ body {
   }
 
   .qr-test-camera {
-    width: min(100%, 61.333dvh, 427px);
+    width: min(100%, 46dvh, 320px);
     min-height: 160px;
   }
 
