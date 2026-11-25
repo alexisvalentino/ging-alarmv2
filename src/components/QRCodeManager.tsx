@@ -5,12 +5,14 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
+import jsQR from 'jsqr';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  FileText, Image as ImageIcon, RefreshCw, CheckCircle, ChevronRight, AlertCircle
+  FileText, Image as ImageIcon, RefreshCw, CheckCircle, ChevronRight, AlertCircle, ScanLine
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { GingAndroid } from '../native/GingAndroid';
+import { matchesWakeUpCode } from '../utils/qrValidation';
 
 const loadPngDataUrl = (src: string) => new Promise<{ dataUrl: string; width: number; height: number }>((resolve, reject) => {
   const image = new Image();
@@ -288,6 +290,30 @@ export default function QRCodeManager({ userQRSecret, hasAlarms, onRegenerateSec
     }, 5500);
   };
 
+  const testQRCode = () => {
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context || isGenerating || qrError) return;
+
+    try {
+      const image = context.getImageData(0, 0, canvas.width, canvas.height);
+      const decodedCode = jsQR(image.data, image.width, image.height, {
+        inversionAttempts: 'dontInvert',
+      });
+
+      if (!decodedCode) {
+        triggerToast("Couldn't read this QR code. Try regenerating it.", true);
+      } else if (!matchesWakeUpCode(decodedCode.data, userQRSecret)) {
+        triggerToast('This QR code does not match the current alarm.', true);
+      } else {
+        triggerToast('Code is readable and matches this alarm. Save or print it before relying on it.');
+      }
+    } catch (error) {
+      console.error('QR code test failed:', error);
+      triggerToast('Could not test the QR code. Try again.', true);
+    }
+  };
+
   return (
     <div className="relative min-h-dvh ambient-glow-bg ging-screen ging-screen--qr text-white flex flex-col overflow-x-hidden font-sans">
       {/* Ambient haze */}
@@ -311,7 +337,7 @@ export default function QRCodeManager({ userQRSecret, hasAlarms, onRegenerateSec
       <div className="flex-1 max-w-md w-full mx-auto flex flex-col items-center z-10 mt-6 space-y-6 qr-content">
 
         {/* Keep the code on a clean square surface for reliable scanning. */}
-        <div className="qr-code-stage">
+        <div className="qr-code-stage flex-col gap-2">
           <div className="qr-code-frame relative">
             {isGenerating && (
               <div className="absolute inset-0 bg-white/95 flex items-center justify-center rounded-[20px] z-10">
@@ -320,6 +346,15 @@ export default function QRCodeManager({ userQRSecret, hasAlarms, onRegenerateSec
             )}
             <canvas ref={canvasRef} role="img" aria-label="Wake-up QR code" className="qr-code-canvas block" />
           </div>
+          <button
+            type="button"
+            onClick={testQRCode}
+            disabled={isGenerating || !!qrError}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-3 text-[13px] font-medium text-zinc-400 transition-colors hover:text-ging-burnt active:bg-ging-orange/10 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ScanLine className="h-4 w-4" aria-hidden="true" />
+            <span>Check code</span>
+          </button>
         </div>
 
         {qrError && (
