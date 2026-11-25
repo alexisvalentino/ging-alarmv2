@@ -10,6 +10,7 @@ import { matchesWakeUpCode } from '../utils/qrValidation';
 import AlarmSuccessScreen from './AlarmSuccessScreen';
 
 type ScanState = 'starting' | 'scanning' | 'wrong-code' | 'matched' | 'error';
+const QR_SCAN_INTERVAL_MS = 1000 / 15;
 
 interface QRCodeTestScannerProps {
   expectedSecret: string;
@@ -80,14 +81,14 @@ export default function QRCodeTestScanner({ expectedSecret, onClose }: QRCodeTes
   useEffect(() => {
     let isCurrentRequest = true;
     let stream: MediaStream | null = null;
-    let animationFrame: number | null = null;
+    let scanTimeout: number | null = null;
     let wrongCodeTimer: number | null = null;
     let trackEndedListener: (() => void) | null = null;
 
     const stopCamera = () => {
-      if (animationFrame !== null) {
-        window.cancelAnimationFrame(animationFrame);
-        animationFrame = null;
+      if (scanTimeout !== null) {
+        window.clearTimeout(scanTimeout);
+        scanTimeout = null;
       }
       if (wrongCodeTimer !== null) {
         window.clearTimeout(wrongCodeTimer);
@@ -109,13 +110,13 @@ export default function QRCodeTestScanner({ expectedSecret, onClose }: QRCodeTes
     };
 
     const scheduleScan = () => {
-      if (!isCurrentRequest || animationFrame !== null
+      if (!isCurrentRequest || scanTimeout !== null
         || scanStateRef.current === 'matched' || scanStateRef.current === 'error') return;
-      animationFrame = window.requestAnimationFrame(scanFrame);
+      scanTimeout = window.setTimeout(scanFrame, QR_SCAN_INTERVAL_MS);
     };
 
     const scanFrame = () => {
-      animationFrame = null;
+      scanTimeout = null;
       if (!isCurrentRequest || scanStateRef.current === 'matched' || scanStateRef.current === 'error') return;
 
       const video = videoRef.current;
@@ -126,8 +127,10 @@ export default function QRCodeTestScanner({ expectedSecret, onClose }: QRCodeTes
         && scanStateRef.current !== 'wrong-code') {
         try {
           const scale = Math.min(1, 720 / Math.max(video.videoWidth, video.videoHeight));
-          canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
-          canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+          const scanWidth = Math.max(1, Math.round(video.videoWidth * scale));
+          const scanHeight = Math.max(1, Math.round(video.videoHeight * scale));
+          if (canvas.width !== scanWidth) canvas.width = scanWidth;
+          if (canvas.height !== scanHeight) canvas.height = scanHeight;
           context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
           const image = context.getImageData(0, 0, canvas.width, canvas.height);
