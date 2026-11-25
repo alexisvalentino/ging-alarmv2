@@ -3,16 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useCallback, useRef, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import jsQR from 'jsqr';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   FileText, Image as ImageIcon, RefreshCw, CheckCircle, ChevronRight, AlertCircle, ScanLine
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { GingAndroid } from '../native/GingAndroid';
-import { matchesWakeUpCode } from '../utils/qrValidation';
+import QRCodeTestScanner from './QRCodeTestScanner';
 
 const loadPngDataUrl = (src: string) => new Promise<{ dataUrl: string; width: number; height: number }>((resolve, reject) => {
   const image = new Image();
@@ -49,10 +48,13 @@ export default function QRCodeManager({ userQRSecret, hasAlarms, onRegenerateSec
   const cancelRegenerateRef = useRef<HTMLButtonElement>(null);
   const regenerateDialogRef = useRef<HTMLDivElement>(null);
   const feedbackTimerRef = useRef<number | null>(null);
+  const testScanButtonRef = useRef<HTMLButtonElement>(null);
   const [feedback, setFeedback] = useState<{ message: string; isError: boolean } | null>(null);
   const [qrError, setQrError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const closeScanner = useCallback(() => setShowScanner(false), []);
 
   // Generate QR code and paint on Canvas
   useEffect(() => {
@@ -85,6 +87,11 @@ export default function QRCodeManager({ userQRSecret, hasAlarms, onRegenerateSec
   useEffect(() => () => {
     if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
   }, []);
+
+  useEffect(() => {
+    if (!showScanner) return;
+    return () => testScanButtonRef.current?.focus();
+  }, [showScanner]);
 
   useEffect(() => {
     if (!showRegenerateConfirm) return;
@@ -290,30 +297,6 @@ export default function QRCodeManager({ userQRSecret, hasAlarms, onRegenerateSec
     }, 5500);
   };
 
-  const testQRCode = () => {
-    const canvas = canvasRef.current;
-    const context = canvas?.getContext('2d');
-    if (!canvas || !context || isGenerating || qrError) return;
-
-    try {
-      const image = context.getImageData(0, 0, canvas.width, canvas.height);
-      const decodedCode = jsQR(image.data, image.width, image.height, {
-        inversionAttempts: 'dontInvert',
-      });
-
-      if (!decodedCode) {
-        triggerToast("Couldn't read this QR code. Try regenerating it.", true);
-      } else if (!matchesWakeUpCode(decodedCode.data, userQRSecret)) {
-        triggerToast('This QR code does not match the current alarm.', true);
-      } else {
-        triggerToast('Code is readable and matches this alarm. Save or print it before relying on it.');
-      }
-    } catch (error) {
-      console.error('QR code test failed:', error);
-      triggerToast('Could not test the QR code. Try again.', true);
-    }
-  };
-
   return (
     <div className="relative min-h-dvh ambient-glow-bg ging-screen ging-screen--qr text-white flex flex-col overflow-x-hidden font-sans">
       {/* Ambient haze */}
@@ -348,12 +331,13 @@ export default function QRCodeManager({ userQRSecret, hasAlarms, onRegenerateSec
           </div>
           <button
             type="button"
-            onClick={testQRCode}
+            ref={testScanButtonRef}
+            onClick={() => setShowScanner(true)}
             disabled={isGenerating || !!qrError}
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-3 text-[13px] font-medium text-zinc-400 transition-colors hover:text-ging-burnt active:bg-ging-orange/10 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <ScanLine className="h-4 w-4" aria-hidden="true" />
-            <span>Check code</span>
+            <span>Try a scan</span>
           </button>
         </div>
 
@@ -489,6 +473,10 @@ export default function QRCodeManager({ userQRSecret, hasAlarms, onRegenerateSec
           <ChevronRight className="w-4 h-4" />
         </button>
       </div>
+
+      {showScanner && (
+        <QRCodeTestScanner expectedSecret={userQRSecret} onClose={closeScanner} />
+      )}
     </div>
   );
 }
