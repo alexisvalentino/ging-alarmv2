@@ -5,7 +5,6 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Capacitor } from '@capacitor/core';
 import {
   Plus, Play, Square, QrCode, X, Minus, Tag, Volume2
 } from 'lucide-react';
@@ -69,7 +68,7 @@ export default function Dashboard({
   const [showAddForm, setShowAddForm] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editingAlarmId, setEditingAlarmId] = useState<string | null>(null);
-  const [newTime, setNewTime] = useState<string | null>(null);
+  const [newTime, setNewTime] = useState<string | null>('06:00');
   const [newLabel, setNewLabel] = useState('');
   const [newDays, setNewDays] = useState<number[]>([1, 2, 3, 4, 5]); // weekdays by default
   const [newSoundType, setNewSoundType] = useState<Alarm['soundType']>('industrial');
@@ -137,7 +136,7 @@ export default function Dashboard({
     previewTimerRef.current = null;
     setPreviewPlaying(null);
     setShowAddForm(false);
-    setNewTime(null);
+    setNewTime('06:00');
     setNewLabel('');
     setNewDays([1, 2, 3, 4, 5]);
     setNewSoundType('industrial');
@@ -247,7 +246,10 @@ export default function Dashboard({
             {editing || editingAlarmId !== null ? 'Done' : 'Manage'}
           </button>
           <button
-            onClick={() => setShowAddForm(true)}
+            onClick={() => {
+              setNewTime('06:00');
+              setShowAddForm(true);
+            }}
             className="w-16 h-11 flex items-center justify-end"
             aria-label="Add alarm"
             ref={addAlarmButtonRef}
@@ -418,19 +420,9 @@ export default function Dashboard({
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4 alarm-form">
-                  {/* Keep iOS's wheel interaction and let Android open its native time picker. */}
+                  {/* Keep the app's scroll-wheel time picker consistent across platforms. */}
                   <div className="glass-card py-5 flex justify-center time-wheel-card alarm-time-field">
-                    {Capacitor.getPlatform() === 'android' ? (
-                      <input
-                        className="native-time-input"
-                        type="time"
-                        value={newTime ?? ''}
-                        onChange={event => setNewTime(event.target.value || null)}
-                        aria-label="Alarm time"
-                      />
-                    ) : (
-                      <TimeWheelPicker value={newTime} onChange={setNewTime} />
-                    )}
+                    <TimeWheelPicker value={newTime} onChange={setNewTime} />
                   </div>
 
                   {/* Label */}
