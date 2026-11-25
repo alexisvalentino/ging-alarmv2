@@ -645,15 +645,108 @@ body {
   padding: 0;
 }
 
-.qr-test-viewfinder {
+.qr-test-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  box-sizing: border-box;
+  display: flex;
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow-y: auto;
+  padding-block: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-bottom));
+  padding-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right));
+  color: #FFFFFF;
+  background: #211a17;
+}
+
+.qr-test-fullscreen--matched {
+  color: var(--ging-ink);
+  background: var(--ging-bg);
+}
+
+.qr-test-screen {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: 100%;
+  max-width: 760px;
+  min-height: 0;
+  margin-inline: auto;
+}
+
+.qr-test-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 8px 16px;
+}
+
+.qr-test-camera {
   position: relative;
+  flex: 1;
   width: 100%;
   min-height: 220px;
-  max-height: 44dvh;
-  aspect-ratio: 4 / 3;
   overflow: hidden;
-  border-radius: 24px;
+  border-radius: 28px;
   background: #211a17;
+}
+
+.qr-test-scan-overlay {
+  color: rgba(255, 248, 246, 0.96);
+}
+
+.qr-test-scan-frame {
+  width: min(72vw, 18rem);
+  aspect-ratio: 1;
+}
+
+.qr-test-status {
+  display: flex;
+  flex: none;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  padding-block: 12px;
+  color: rgba(255, 248, 246, 0.88);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  text-align: center;
+}
+
+.qr-test-status--error {
+  color: #fecaca;
+}
+
+.qr-test-success {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-block: 32px;
+  text-align: center;
+}
+
+@media (max-height: 600px) {
+  .qr-test-header {
+    padding-block: 0 10px;
+  }
+
+  .qr-test-camera {
+    min-height: 180px;
+  }
+
+  .qr-test-status {
+    min-height: 42px;
+    padding-block: 8px;
+  }
+
+  .qr-test-success {
+    padding-block: 20px;
+  }
 }
 
 .qr-code-frame {

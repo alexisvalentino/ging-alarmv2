@@ -334,7 +334,7 @@ export default function QRCodeManager({ userQRSecret, hasAlarms, onRegenerateSec
             ref={testScanButtonRef}
             onClick={() => setShowScanner(true)}
             disabled={isGenerating || !!qrError}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-3 text-[13px] font-medium text-zinc-400 transition-colors hover:text-ging-burnt active:bg-ging-orange/10 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-3 text-[13px] font-medium text-zinc-400 transition-colors active:bg-ging-orange/10 active:text-ging-burnt disabled:cursor-not-allowed disabled:opacity-50"
           >
             <ScanLine className="h-4 w-4" aria-hidden="true" />
             <span>Try a scan</span>

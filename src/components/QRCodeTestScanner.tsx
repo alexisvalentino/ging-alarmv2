@@ -5,7 +5,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { AlertCircle, CheckCircle, RefreshCw, X } from 'lucide-react';
-import { motion } from 'motion/react';
 import jsQR from 'jsqr';
 import { matchesWakeUpCode } from '../utils/qrValidation';
 
@@ -71,6 +70,10 @@ export default function QRCodeTestScanner({ expectedSecret, onClose }: QRCodeTes
       window.removeEventListener('ging:back', handleNativeBack, true);
     };
   }, [onClose]);
+
+  useEffect(() => {
+    if (scanState === 'matched') closeButtonRef.current?.focus();
+  }, [scanState]);
 
   useEffect(() => {
     let isCurrentRequest = true;
@@ -224,111 +227,106 @@ export default function QRCodeTestScanner({ expectedSecret, onClose }: QRCodeTes
   }, [expectedSecret, retryCount]);
 
   const retryCamera = () => {
+    closeButtonRef.current?.focus();
     setCameraError(null);
     setRetryCount(count => count + 1);
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto px-5 py-6 qr-confirm-backdrop"
-      style={{ paddingBlock: 'max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-bottom))' }}
-      onClick={event => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <motion.div
+    <div className={`qr-test-fullscreen ${scanState === 'matched' ? 'qr-test-fullscreen--matched' : ''}`}>
+      <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="qr-test-title"
-        aria-describedby="qr-test-description"
-        className="qr-confirm-card w-full max-w-md max-h-[calc(100dvh-32px)] overflow-y-auto rounded-[28px] p-5 sm:p-6"
-        initial={{ opacity: 0, y: 10, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-        onClick={event => event.stopPropagation()}
+        aria-describedby={scanState === 'matched' ? 'qr-test-result-copy' : 'qr-test-description'}
+        className="qr-test-screen"
       >
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <h2 id="qr-test-title" className="text-[21px] leading-tight font-semibold text-[#261711]">
-              Try a scan
-            </h2>
-            <p id="qr-test-description" className="mt-2 text-[14px] leading-relaxed text-[#674d42]">
-              Point the camera at a printed code or another screen. This check won&apos;t stop an alarm.
-            </p>
-          </div>
-          <button
-            ref={closeButtonRef}
-            type="button"
-            onClick={onClose}
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-[#674d42] transition-colors hover:bg-[#6c3a22]/[0.08] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ging-orange"
-            aria-label="Close QR scanner"
-          >
-            <X className="h-5 w-5" aria-hidden="true" />
-          </button>
-        </div>
-
-        <div className="qr-test-viewfinder" style={{ containerType: 'inline-size' }}>
-          <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" playsInline muted aria-hidden="true" />
-          <canvas ref={canvasRef} className="hidden" aria-hidden="true" />
-
-          {scanState === 'starting' && (
-            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-[#211a17] p-5 text-center text-white" role="status" aria-live="polite">
-              <RefreshCw className="h-7 w-7 animate-spin text-ging-orange" aria-hidden="true" />
-              <span className="text-[14px] font-medium">Starting camera…</span>
-            </div>
-          )}
-
-          {scanState === 'error' && (
-            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-[#211a17]/95 p-6 text-center text-white" role="alert">
-              <AlertCircle className="h-8 w-8 text-red-300" aria-hidden="true" />
-              <p className="max-w-xs text-[14px] leading-relaxed text-white/85">{cameraError}</p>
-              <button
-                type="button"
-                onClick={retryCamera}
-                className="glass-button min-h-11 rounded-full px-5 text-[14px] font-semibold"
-              >
-                Try camera again
-              </button>
-            </div>
-          )}
-
-          {(scanState === 'scanning' || scanState === 'wrong-code') && (
-            <div className={`scanner-overlay absolute inset-0 flex items-center justify-center ${scanState === 'wrong-code' ? 'text-red-300' : 'text-white'}`} aria-hidden="true">
-              <div className="scanner-frame relative">
-                <div className="scanner-corner absolute -top-px -left-px h-8 w-8 border-t-2 border-l-2 rounded-tl-2xl" />
-                <div className="scanner-corner absolute -top-px -right-px h-8 w-8 border-t-2 border-r-2 rounded-tr-2xl" />
-                <div className="scanner-corner absolute -bottom-px -left-px h-8 w-8 border-b-2 border-l-2 rounded-bl-2xl" />
-                <div className="scanner-corner absolute -bottom-px -right-px h-8 w-8 border-b-2 border-r-2 rounded-br-2xl" />
-              </div>
-            </div>
-          )}
-
-          {scanState === 'matched' && (
-            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-[#fff8f6]/95 p-6 text-center text-[#261813]" role="status" aria-live="polite">
-              <CheckCircle className="h-10 w-10 text-emerald-500" aria-hidden="true" />
-              <h3 className="text-[19px] font-semibold">That&apos;s your wake-up code</h3>
-              <p className="max-w-xs text-[14px] leading-relaxed text-[#674d42]">
-                It matches this alarm. Save or print it so you can scan it when the alarm rings.
+        {scanState === 'matched' ? (
+          <>
+            <main className="qr-test-success" role="status" aria-live="polite">
+              <CheckCircle className="h-14 w-14 text-emerald-600" aria-hidden="true" />
+              <h1 id="qr-test-title" className="mt-5 text-2xl font-semibold leading-tight">
+                That&apos;s your wake-up code
+              </h1>
+              <p id="qr-test-result-copy" className="mt-3 max-w-sm text-base leading-relaxed text-[#674d42]">
+                It matches this alarm. Save or print it before your next alarm.
               </p>
+            </main>
+            <button
+              ref={closeButtonRef}
+              type="button"
+              onClick={onClose}
+              className="glass-button-glow min-h-12 w-full rounded-2xl text-base font-semibold active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ging-orange"
+            >
+              Done
+            </button>
+          </>
+        ) : (
+          <>
+            <header className="qr-test-header">
+              <div className="min-w-0">
+                <h1 id="qr-test-title" className="text-xl font-semibold leading-tight">Try a scan</h1>
+                <p id="qr-test-description" className="mt-1 text-sm leading-relaxed text-white/75">
+                  Point at a printed code or another screen. This won&apos;t stop an alarm.
+                </p>
+              </div>
+              <button
+                ref={closeButtonRef}
+                type="button"
+                onClick={onClose}
+                className="grid h-12 w-12 shrink-0 place-items-center rounded-full text-white active:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ging-orange"
+                aria-label="Close scanner"
+              >
+                <X className="h-6 w-6" aria-hidden="true" />
+              </button>
+            </header>
+
+            <div className="qr-test-camera" style={{ containerType: 'inline-size' }}>
+              <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" playsInline muted aria-hidden="true" />
+              <canvas ref={canvasRef} className="hidden" aria-hidden="true" />
+
+              {scanState === 'starting' && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-[#211a17] p-5 text-center text-white" role="status" aria-live="polite">
+                  <RefreshCw className="h-7 w-7 animate-spin motion-reduce:animate-none text-ging-orange" aria-hidden="true" />
+                  <span className="text-sm font-medium">Starting camera…</span>
+                </div>
+              )}
+
+              {scanState === 'error' && (
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-[#211a17]/95 p-6 text-center text-white" role="alert">
+                  <AlertCircle className="h-8 w-8 text-red-300" aria-hidden="true" />
+                  <p className="max-w-xs text-sm leading-relaxed text-white/85">{cameraError}</p>
+                  <button
+                    type="button"
+                    onClick={retryCamera}
+                    className="glass-button min-h-12 rounded-full px-5 text-sm font-semibold active:scale-[0.99]"
+                  >
+                    Try camera again
+                  </button>
+                </div>
+              )}
+
+              {(scanState === 'scanning' || scanState === 'wrong-code') && (
+                <div className={`qr-test-scan-overlay absolute inset-0 flex items-center justify-center ${scanState === 'wrong-code' ? 'text-red-200' : ''}`} aria-hidden="true">
+                  <div className="qr-test-scan-frame relative">
+                    <div className="scanner-corner absolute -top-px -left-px h-10 w-10 border-t-2 border-l-2 rounded-tl-2xl" />
+                    <div className="scanner-corner absolute -top-px -right-px h-10 w-10 border-t-2 border-r-2 rounded-tr-2xl" />
+                    <div className="scanner-corner absolute -bottom-px -left-px h-10 w-10 border-b-2 border-l-2 rounded-bl-2xl" />
+                    <div className="scanner-corner absolute -bottom-px -right-px h-10 w-10 border-b-2 border-r-2 rounded-br-2xl" />
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {(scanState === 'scanning' || scanState === 'wrong-code') && (
-          <p className={`mt-3 min-h-6 text-center text-[13px] leading-relaxed ${scanState === 'wrong-code' ? 'text-red-700' : 'text-[#76594e]'}`} role="status" aria-live="polite">
-            {scanState === 'wrong-code' ? 'That’s a different code. Keep scanning your wake-up code.' : 'Center the code in the frame.'}
-          </p>
+            {(scanState === 'scanning' || scanState === 'wrong-code') && (
+              <p className={`qr-test-status ${scanState === 'wrong-code' ? 'qr-test-status--error' : ''}`} role="status" aria-live="polite">
+                {scanState === 'wrong-code' ? 'That’s a different code. Keep scanning your wake-up code.' : 'Center the code in the frame.'}
+              </p>
+            )}
+          </>
         )}
-
-        <button
-          type="button"
-          onClick={onClose}
-          className="glass-button-glow mt-4 min-h-12 w-full rounded-2xl text-[15px] font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ging-orange"
-        >
-          {scanState === 'matched' ? 'Done' : 'Close scanner'}
-        </button>
-      </motion.div>
+      </div>
     </div>
   );
 }
